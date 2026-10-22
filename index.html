@@ -195,7 +195,7 @@ html.locked body>*:not(#gate){visibility:hidden}
 <script>
 /* Password gate. Stores only a PBKDF2 hash; the device is remembered in localStorage. */
 (function(){
-  var PASS_HASH='';           /* hex PBKDF2-SHA256, задаётся через hash.html */
+  var PASS_HASH='39928f016c53700d9591655fdb569ceb6c80bd25396013cf03f593a79b08adcb';           /* hex PBKDF2-SHA256, задаётся через hash.html */
   var SALT='zhemchug-images-v1', ITER=150000, KEY='zhemchug-auth';
   var root=document.documentElement, gate=document.getElementById('gate');
   function unlock(){root.classList.remove('locked');gate.hidden=true;}
