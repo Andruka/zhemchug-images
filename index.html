@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru">
 <head>
+<script>try{if(localStorage.getItem("zhemchug-auth")!==null)document.documentElement.classList.add("maybe")}catch(e){}document.documentElement.classList.add("locked")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Жемчуг · Картинки</title>
@@ -109,14 +110,33 @@ textarea.inp{resize:vertical}
   .stage canvas{max-height:58dvh}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+#gate{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+#gate form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px;align-items:stretch;text-align:center}
+#gate img{width:72px;height:72px;align-self:center}
+#gate h1{margin:0;font-size:24px;letter-spacing:.24em;font-weight:600}
+#gate p{margin:0;color:var(--muted)}
+#gate .err{color:#B3261E;font-weight:600;min-height:1.4em}
+html.locked body>*:not(#gate){visibility:hidden}
 </style>
 </head>
 <body>
+<div id="gate" hidden>
+  <form id="gateForm" autocomplete="on">
+    <img src="pearl.png" alt="">
+    <h1>ЖЕМЧУГ</h1>
+    <p>Введите пароль. На этом устройстве его больше не спросят.</p>
+    <input class="inp" id="gatePass" type="password" autocomplete="current-password" placeholder="Пароль" aria-label="Пароль" required>
+    <button class="save" type="submit" id="gateBtn">Войти</button>
+    <span class="err" id="gateErr" role="alert"></span>
+  </form>
+</div>
 <header class="bar"><div class="wrap">
   <button class="brand" id="home" type="button" aria-label="К шаблонам"><img src="pearl.png" alt=""><span><b>ЖЕМЧУГ</b><small>КАРТИНКИ ДЛЯ СОЦСЕТЕЙ</small></span></button>
   <span class="sp"></span>
   <button class="ghost" id="btnBack" type="button" hidden>← Шаблоны</button>
   <button class="ghost" id="btnClinic" type="button">Клиника</button>
+  <button class="ghost" id="btnLogout" type="button" title="Выйти на этом устройстве">Выйти</button>
 </div></header>
 
 <main>
@@ -172,6 +192,34 @@ textarea.inp{resize:vertical}
 </div>
 <div id="toast" role="status" hidden></div>
 
+<script>
+/* Password gate. Stores only a PBKDF2 hash; the device is remembered in localStorage. */
+(function(){
+  var PASS_HASH='';           /* hex PBKDF2-SHA256, задаётся через hash.html */
+  var SALT='zhemchug-images-v1', ITER=150000, KEY='zhemchug-auth';
+  var root=document.documentElement, gate=document.getElementById('gate');
+  function unlock(){root.classList.remove('locked');gate.hidden=true;}
+  function hex(buf){return Array.prototype.map.call(new Uint8Array(buf),function(b){return ('0'+b.toString(16)).slice(-2);}).join('');}
+  function derive(pw){var enc=new TextEncoder();
+    return crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveBits']).then(function(k){
+      return crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode(SALT),iterations:ITER,hash:'SHA-256'},k,256);}).then(hex);}
+  window.zhemchugDerive=derive;
+  var stored=null;try{stored=localStorage.getItem(KEY);}catch(e){}
+  if(!PASS_HASH||stored===PASS_HASH){unlock();}
+  else{gate.hidden=false;setTimeout(function(){document.getElementById('gatePass').focus();},50);}
+  document.getElementById('gateForm').addEventListener('submit',function(e){
+    e.preventDefault();var btn=document.getElementById('gateBtn'),err=document.getElementById('gateErr');
+    btn.disabled=true;err.textContent='';
+    derive(document.getElementById('gatePass').value).then(function(h){
+      if(h===PASS_HASH){try{localStorage.setItem(KEY,h);}catch(e){}unlock();}
+      else{err.textContent='Неверный пароль. Попробуйте ещё раз.';}
+    }).catch(function(){err.textContent='Браузер не поддерживает вход. Обновите браузер.';}).then(function(){btn.disabled=false;});
+  });
+  document.getElementById('btnLogout').hidden=!PASS_HASH;
+  document.getElementById('btnLogout').addEventListener('click',function(){
+    try{localStorage.removeItem(KEY);}catch(e){}location.reload();});
+})();
+</script>
 <script>
 (function(){
 'use strict';
