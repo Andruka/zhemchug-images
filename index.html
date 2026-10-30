@@ -625,36 +625,37 @@ function pill(c,cx,y,text,ic,k,fill){
 }
 function pillW(c,text,ic,k){setFont(c,700,34*k);return c.measureText(text).width+(ic?34*k+20*k:0)+56*k;}
 var GDRAW={
- /* Safe zone, measured in VK: desktop shows the bottom 3:1 (top ~130px cut), phones show the full width at ~390px,
-    hide the bottom ~70px under the card and put round buttons in the top corners. Text is sized to stay readable at 390px. */
+ /* Safe zone, measured in VK (canvas px): desktop shows the bottom 3:1, so y<130 is cut. The mobile site shows the full
+    width at ~390px; its round buttons cover x<270 and x>1620 for y<260, the avatar covers x 75–575 for y>500,
+    and only the last ~20px are hidden. Text is sized to stay readable at 390px. */
  cover:function(c,w,h){
   grad(c,w,h);var img=bgImage('post_soft_nacre_v1');
   if(img.complete&&img.naturalWidth)fitBottom(c,img,0,0,w,h);
-  var d=S.cover,k3=S.clinic,mid=430,
+  var d=S.cover,k3=S.clinic,
       a1=(k3.addr1||'').trim(),a2=(k3.addr2||'').trim(),
       ps=[k3.ph1,k3.ph2].map(function(s){return (s||'').trim();}).filter(Boolean),
-      card=d.phones&&(a1||ps.length),cx=card?520:w/2;
-  /* left: logo + tagline */
-  var k=1.6,setTag=function(){setFont(c,600,54);},tl=[];
-  if(d.tagline){setTag();tl=wrap(c,d.tagline,card?720:1300);}
-  var lh=72,blockH=172+(tl.length?36+tl.length*lh:0),y=logo(c,cx,mid-blockH/2,k,false)+36;
-  if(tl.length){setTag();c.fillStyle=COL.soft;c.textAlign='center';tl.forEach(function(l){c.fillText(l,cx,y+54*.8);y+=lh;});}
+      card=d.phones&&(a1||ps.length),cx=card?690:w/2;
+  /* left: logo + tagline, kept above the mobile avatar */
+  var setTag=function(){setFont(c,600,52);},tl=[];
+  if(d.tagline){setTag();tl=wrap(c,d.tagline,card?700:1300);}
+  var top=card?150:Math.max(150,300-(162+(tl.length?30+tl.length*66:0))/2),y=logo(c,cx,top,1.5,false)+30;
+  if(tl.length){setTag();c.fillStyle=COL.soft;c.textAlign='center';tl.forEach(function(l){c.fillText(l,cx,y+52*.8);y+=66;});}
   if(!card)return;
-  /* right: white card with address and phones, each line shrunk to fit */
-  var x0=1040,cw=760,pad=50,isz=54,tx=x0+pad+isz+26,tw=x0+cw-pad-tx;
+  /* right: white card with address and phones, below the mobile menu button */
+  var x0=1090,cw=700,pad=40,isz=50,tx=x0+pad+isz+24,tw=x0+cw-pad-tx;
   function fit(t,wt,sz){setFont(c,wt,sz);while(c.measureText(t).width>tw&&sz>30){sz-=2;setFont(c,wt,sz);}return sz;}
   var rows=[];
-  if(a1)rows.push({ic:P_PIN,t:a1,wt:700,sz:fit(a1,700,46),sub:a2,h:a2?112:64});
-  ps.forEach(function(p){rows.push({ic:P_PHONE,t:p,wt:800,sz:fit(p,800,62),h:78});});
-  var gap=34,ch=pad*2+rows.reduce(function(s,r){return s+r.h;},0)+gap*(rows.length-1),y0=mid-ch/2;
-  plate(c,x0,y0,cw,ch,44,'rgba(255,255,255,.86)',true,'rgba(255,255,255,.95)');
+  if(a1)rows.push({ic:P_PIN,t:a1,wt:700,sz:fit(a1,700,44),sub:a2,h:a2?100:60});
+  ps.forEach(function(p){rows.push({ic:P_PHONE,t:p,wt:800,sz:fit(p,800,60),h:72});});
+  var gap=28,ch=pad*2+rows.reduce(function(s,r){return s+r.h;},0)+gap*(rows.length-1),y0=Math.max(300,490-ch/2);
+  plate(c,x0,y0,cw,ch,40,'rgba(255,255,255,.86)',true,'rgba(255,255,255,.95)');
   var yy=y0+pad;
   rows.forEach(function(r,i){
     if(i){c.save();c.fillStyle='rgba(22,51,91,.12)';c.fillRect(x0+pad,yy-gap/2-1,cw-pad*2,2);c.restore();}
     var base=yy+r.sz*.78+(r.sub?0:(r.h-r.sz)/2-r.sz*.06);
     iconPath(c,r.ic,x0+pad,base-r.sz*.36-isz/2,isz,COL.steel,r.ic===P_PIN);
     setFont(c,r.wt,r.sz);c.fillStyle=COL.ink;c.textAlign='left';c.fillText(r.t,tx,base);
-    if(r.sub){var sz=fit(r.sub,500,38);setFont(c,500,sz);c.fillStyle=COL.soft;c.fillText(r.sub,tx,base+52);}
+    if(r.sub){var sz=fit(r.sub,500,36);setFont(c,500,sz);c.fillStyle=COL.soft;c.fillText(r.sub,tx,base+48);}
     yy+=r.h+gap;
   });
  },
