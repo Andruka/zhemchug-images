@@ -433,6 +433,7 @@ function bgImage(id,cb){
   return im;
 }
 function bgFor(tpl,fmt){
+  if(isDark(tpl)) return DARK_SRC[fmt];
   var pick=S.bgPick[tpl+'_'+fmt];
   if(pick) return pick;
   if(tpl==='free'&&S.free.spec==='Детский доктор') return KIDS_BG[fmt];
@@ -450,16 +451,18 @@ function plate(c,x,y,w,h,r,fill,shadow,stroke){
   rr(c,x,y,w,h,r);c.fillStyle=fill;c.fill();c.restore();
   if(stroke){c.save();rr(c,x,y,w,h,r);c.strokeStyle=stroke;c.lineWidth=2;c.stroke();c.restore();}
 }
+/* words for line breaking: a one- or two-letter word stays with the next one («о зубах», «и детей») */
+function words(t){var L='[A-Za-zА-Яа-яЁё]{1,2}';return String(t||'').replace(new RegExp('(^|[ \\t\\n])('+L+') +(?=\\S)','g'),'$1$2\u00A0').replace(new RegExp('(\u00A0)('+L+') +(?=\\S)','g'),'$1$2\u00A0').split(/[ \t\n]+/).filter(Boolean);}
 function wrap(c,text,maxW){
   var out=[];String(text||'').split('\n').forEach(function(par){
-    var words=par.split(/\s+/).filter(Boolean),line='';
-    words.forEach(function(w){var t=line?line+' '+w:w;if(!line||c.measureText(t).width<=maxW)line=t;else{out.push(line);line=w;}});
+    var words_=words(par),line='';
+    words_.forEach(function(w){var t=line?line+' '+w:w;if(!line||c.measureText(t).width<=maxW)line=t;else{out.push(line);line=w;}});
     if(line)out.push(line);});
   return out;
 }
 function fitSize(c,text,size,weight,maxW){
-  var words=String(text||'').split(/\s+/).filter(Boolean);
-  function widest(){setFont(c,weight,size);var m=0;words.forEach(function(w){m=Math.max(m,c.measureText(w).width);});return m;}
+  var ws=words(text);
+  function widest(){setFont(c,weight,size);var m=0;ws.forEach(function(w){m=Math.max(m,c.measureText(w).width);});return m;}
   while(widest()>maxW&&size>26)size-=3; return size;
 }
 function head(c,text,cy,size,color,weight,maxW){
@@ -535,24 +538,28 @@ function drawFooter(c,H,st){
   return top;
 }
 
-function darkBg(c,w,h){
+/* dark look = the same nacre photos, gradient-mapped into the brand navy offline (tools/mkdark.py),
+   so it keeps the silk sheen of the light templates */
+var DARK_SRC={story:'story_dark_v1',post:'post_dark_v1'};
+function darkBg(c,w,h,img){
+  if(img&&img.complete&&img.naturalWidth){coverImg(c,img,0,0,w,h);return;}
   var g=c.createLinearGradient(0,0,w*.5,h);g.addColorStop(0,'#24497C');g.addColorStop(1,'#0E2445');c.fillStyle=g;c.fillRect(0,0,w,h);
-  var r=c.createRadialGradient(w*.9,h*.1,0,w*.9,h*.1,w*.95);r.addColorStop(0,'rgba(169,203,234,.30)');r.addColorStop(1,'rgba(169,203,234,0)');c.fillStyle=r;c.fillRect(0,0,w,h);
-  if(!(pearlImg.complete&&pearlImg.naturalWidth))return;
-  /* a few pearls in the bottom-right corner, away from the left-aligned footer */
-  [[.9,.93,.075],[.79,.965,.042],[.97,.84,.034]].forEach(function(p){var s=w*p[2]*2;
-    c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=s*.3;c.shadowOffsetY=s*.08;c.drawImage(pearlImg,w*p[0]-s/2,h*p[1]-s/2,s,s);c.restore();});
 }
-/* full-width band; returns its height. Text goes on two lines when one line would be too small */
+/* full-width band, quiet on purpose: the law asks for the area, not for contrast. One line when it fits, else two */
 function warnBand(c,w,y,bh){
-  c.fillStyle=LIGHT_COL.ink;c.fillRect(0,y,w,bh);
-  var t=WARN_TEXT.toUpperCase(),mw=w-80,fs=Math.floor(bh*.42),lines=[t];
-  setFont(c,700,fs);ls(c,1);
-  if(c.measureText(t).width>mw){var half=t.indexOf(' НЕОБХОДИМА');lines=[t.slice(0,half),t.slice(half+1)];fs=Math.floor(bh*.33);setFont(c,700,fs);
-    while(lines.some(function(l){return c.measureText(l).width>mw;})&&fs>14){fs--;setFont(c,700,fs);}}
-  c.fillStyle='#FFFFFF';c.textAlign='center';
-  var lh=fs*1.22,y0=y+bh/2-lh*lines.length/2;
-  lines.forEach(function(l,i){c.fillText(l,w/2,y0+i*lh+fs*.95);});ls(c,0);
+  c.fillStyle='rgba(255,255,255,.78)';c.fillRect(0,y,w,bh);
+  c.fillStyle='rgba(22,51,91,.14)';c.fillRect(0,y,w,2);
+  var mw=w-96,fs=Math.floor(bh*.34),lines=[WARN_TEXT];
+  setFont(c,600,fs);
+  if(c.measureText(WARN_TEXT).width>mw){
+    var one=fs;while(c.measureText(WARN_TEXT).width>mw&&one>20){one--;setFont(c,600,one);}
+    if(one>=Math.floor(bh*.26))fs=one;
+    else{var half=WARN_TEXT.indexOf(' Необходима');lines=[WARN_TEXT.slice(0,half),WARN_TEXT.slice(half+1)];fs=Math.floor(bh*.3);setFont(c,600,fs);
+      while(lines.some(function(l){return c.measureText(l).width>mw;})&&fs>16){fs--;setFont(c,600,fs);}}
+  }
+  setFont(c,600,fs);c.fillStyle=LIGHT_COL.soft;c.textAlign='center';
+  var lh=fs*1.3,y0=y+bh/2-lh*lines.length/2;
+  lines.forEach(function(l,i){c.fillText(l,w/2,y0+i*lh+fs*1.0);});
   return bh;
 }
 function logoW(c,k,st){var fs=(st?84:72)*k;setFont(c,600,fs);ls(c,fs*.22);var tw=c.measureText('ЖЕМЧУГ').width-fs*.22;ls(c,0);return (st?46:40)*k*2+22*k+tw;}
@@ -785,7 +792,7 @@ var GDRAW={
   var ns=36,nl=[];
   if(p.note){for(;ns>=28;ns-=2){setFont(c,500,ns);nl=wrap(c,p.note,mw-100);if(nl.length<=2&&!nl.some(function(l){return c.measureText(l).width>mw-100;}))break;}}
   /* two note lines: split where both halves are closest in width, so no word hangs alone */
-  if(nl.length===2){var ws=p.note.split(/\s+/),best=null;for(var k=1;k<ws.length;k++){var l1=ws.slice(0,k).join(' '),l2=ws.slice(k).join(' '),m=Math.max(c.measureText(l1).width,c.measureText(l2).width);if(!best||m<best.m)best={m:m,l:[l1,l2]};}if(best)nl=best.l;}
+  if(nl.length===2){var ws=words(p.note),best=null;for(var k=1;k<ws.length;k++){var l1=ws.slice(0,k).join(' '),l2=ws.slice(k).join(' '),m=Math.max(c.measureText(l1).width,c.measureText(l2).width);if(!best||m<best.m)best={m:m,l:[l1,l2]};}if(best)nl=best.l;}
   var lh=sz*1.08,cat=(p.cat||'').toUpperCase(),catH=cat?70:0,nameH=lines.length*lh,
       priceH=p.price?190:0,noteH=nl.length?14+nl.length*ns*1.32:0,gap=44,tot=catH+nameH+(priceH?gap+priceH:0)+noteH,y=Math.max(205,550-tot/2);
   if(cat){setFont(c,800,32);ls(c,5);c.fillStyle=COL.steel;c.textAlign='center';c.fillText(cat,cx+2.5,y+30);ls(c,0);y+=catH;}
@@ -820,7 +827,7 @@ function render(canvas,tpl,fmt){
   if(tpl==='photo'){drawPhoto(c,W,H,st,fmt);return;}
   setTheme(dark);
   try{
-  if(dark)darkBg(c,W,H);
+  if(dark)darkBg(c,W,H,img);
   else{grad(c,W,H);if(img.complete&&img.naturalWidth)coverImg(c,img,0,0,W,H);}
   CW=Math.round(W*(meta.right||.94))-M;
   var hb=drawHeader(c,(st?104:62)+(meta.top||0)*H,st);
@@ -891,7 +898,7 @@ function fmtSection(){
   });
   if(S.tpl==='photo')return sec('Формат',[seg]);
   var strip=el('div',{'class':'bgs'}),cur=bgFor(S.tpl,S.fmt),dark=isDark(S.tpl);
-  if(S.tpl==='tip'||S.tpl==='myth')strip.appendChild(el('button',{type:'button','class':'dark','aria-pressed':String(dark),'aria-label':'Тёмный фон',style:'aspect-ratio:'+(S.fmt==='story'?'9/16':'4/5'),on:{click:function(){S.dark[S.tpl]=true;buildForm();redraw();}}},[el('span',{text:'Тёмный'})]));
+  if(S.tpl==='tip'||S.tpl==='myth')strip.appendChild(el('button',{type:'button','class':'dark','aria-pressed':String(dark),'aria-label':'Тёмный фон',style:'aspect-ratio:'+(S.fmt==='story'?'9/16':'4/5'),on:{click:function(){S.dark[S.tpl]=true;bgImage(DARK_SRC[S.fmt],redraw);buildForm();redraw();}}},[el('span',{text:'Тёмный'})]));
   BGS[S.fmt].forEach(function(b){
     strip.appendChild(el('button',{type:'button','aria-pressed':String(!dark&&b.id===cur),'aria-label':'Фон',on:{click:function(){if(S.dark&&S.tpl in S.dark)S.dark[S.tpl]=false;S.bgPick[S.tpl+'_'+S.fmt]=b.id;bgImage(b.id,redraw);buildForm();redraw();}}},[el('img',{src:'thumb/'+b.id+'.jpg',alt:'',loading:'lazy'})]));
   });
