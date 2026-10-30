@@ -53,10 +53,13 @@ button{cursor:pointer}
 .tcard.today canvas{outline:3px solid var(--ink);outline-offset:-3px}
 .tcard.today span{color:var(--ink);font-weight:700}
 .plan{display:flex;flex-direction:column;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 16px;margin-bottom:18px}
-.plan span{color:var(--muted);font-size:13.5px}
+.plan span{color:var(--muted);font-size:13.5px;white-space:pre-line}
+.bgs .dark{display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;background:linear-gradient(160deg,#24497C,#0E2445);color:#fff;font-size:12px;font-weight:700}
+.range{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center;font-size:14px}
+.range input{accent-color:var(--ink)}
 .gtitle{margin:8px 0 14px;font-size:22px;font-weight:800}
 .ggrid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
-.ggrid .tcard:last-child{max-width:220px}
+.ggrid .tcard.sq{max-width:220px}
 
 /* segmented */
 .seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;gap:2px}
@@ -241,6 +244,15 @@ html.locked body>*:not(#gate){visibility:hidden}
 var W=1080, FORMATS={story:{h:1920},post:{h:1350}};
 var FONT='Montserrat, "Segoe UI", system-ui, sans-serif';
 var COL={ink:'#16335B',steel:'#5F8FBE',soft:'#3F5F86',card:'#D3E6F8',line:'#BAD4EE',chip:'#E2EEF9'};
+/* dark rubric look: render() swaps COL for the duration of one image */
+var LIGHT_COL=Object.assign({},COL),
+    DARK_COL={ink:'#FFFFFF',steel:'#A9CBEA',soft:'#C9DCF0',card:'rgba(255,255,255,.12)',line:'rgba(255,255,255,.32)',chip:'rgba(255,255,255,.12)'},
+    DARK=false;
+function setTheme(d){DARK=!!d;Object.assign(COL,d?DARK_COL:LIGHT_COL);}
+function isDark(tpl){return (tpl==='tip'||tpl==='myth')&&!!(S.dark&&S.dark[tpl]);}
+function plateFill(){return DARK?'rgba(255,255,255,.10)':'rgba(255,255,255,.84)';}
+function plateEdge(){return DARK?'rgba(255,255,255,.24)':'rgba(255,255,255,.95)';}
+function rule(a){return DARK?'rgba(255,255,255,'+a+')':'rgba(22,51,91,'+a+')';}
 var SPEC_TO={
   'Терапевт':'к терапевту','Детский доктор':'к детскому стоматологу','Ортодонт':'к ортодонту','Ортопед':'к ортопеду',
   'Хирург':'к хирургу','Хирург-имплантолог':'к хирургу-имплантологу','Гигиенист':'на проф. гигиену'
@@ -268,7 +280,9 @@ var DEFAULT_BG={
  promo:{story:'story_pearl_strand_v2',post:'post_soft_nacre_v1'},
  doc:{story:'story_tray_corner_v1',post:'post_tray_corner_v2'},
  tip:{story:'story_soft_nacre_v1',post:'post_soft_nacre_v3'},
- price:{story:'story_soft_nacre_v1',post:'post_soft_nacre_v1'}
+ price:{story:'story_soft_nacre_v1',post:'post_soft_nacre_v1'},
+ photo:{story:'story_soft_nacre_v1',post:'post_soft_nacre_v1'},
+ myth:{story:'story_soft_nacre_v3',post:'post_soft_nacre_v3'}
 };
 var KIDS_BG={story:'story_kids_v3',post:'post_kids_v1'};
 
@@ -277,26 +291,78 @@ var TEMPLATES=[
  {id:'promo',name:'Акция',desc:'Скидка или спецпредложение'},
  {id:'doc',name:'Знакомство с врачом',desc:'Врач, специальность, пункты'},
  {id:'tip',name:'Совет или объявление',desc:'Текст на спокойном фоне'},
- {id:'price',name:'Прайс',desc:'Цены по разделам, несколько страниц'}
+ {id:'price',name:'Прайс',desc:'Цены по разделам, несколько страниц'},
+ {id:'photo',name:'Фото',desc:'Своё фото с фирменной плашкой'},
+ {id:'myth',name:'Миф или правда',desc:'Карусель на тёмном фоне'}
 ];
 /* group design: fixed sizes, not story/post */
 var GROUP=[
  {id:'cover',name:'Обложка группы',desc:'1920×768, для ВКонтакте',w:1920,h:768},
- {id:'avatar',name:'Аватар группы',desc:'800×800, видна в круге',w:800,h:800}
+ {id:'avatar',name:'Аватар группы',desc:'800×800, видна в круге',w:800,h:800},
+ {id:'product',name:'Карточка товара',desc:'1080×1080, для раздела «Товары»',w:1080,h:1080}
 ];
 function groupTpl(id){for(var i=0;i<GROUP.length;i++)if(GROUP[i].id===id)return GROUP[i];return null;}
 function tplInfo(id){return TEMPLATES.concat(GROUP).filter(function(x){return x.id===id;})[0];}
 
-/* weekly plan: getDay() -> template and hint */
-var PLAN={
- 1:{tpl:'free',text:'Свободное время на неделю — одним постом'},
- 3:{tpl:'tip',text:'Совет врача или ответ на частый вопрос'},
- 5:{tpl:'doc',text:'Знакомство с врачом или акция'}
-};
-var PLAN_WEEK='Пн — свободное время на неделю · Ср — совет врача · Пт — врач или акция · в другие дни — истории со свободным временем';
+/* two-week plan: odd and even ISO weeks alternate rubrics; getDay() -> template and hint */
+var PLAN=[
+ {1:{tpl:'free',text:'Свободное время на неделю — одним постом'},3:{tpl:'tip',text:'«Врач отвечает»: ответ на частый вопрос'},5:{tpl:'photo',text:'Фото «За кадром»: команда, кабинет, учёба'}},
+ {1:{tpl:'free',text:'Свободное время на неделю — одним постом'},3:{tpl:'myth',text:'«Миф или правда» — карусель'},5:{tpl:'doc',text:'Знакомство с врачом или акция'}}
+];
+var PLAN_WEEK=['Неделя 1: Пн — свободное время · Ср — врач отвечает · Пт — фото «За кадром»','Неделя 2: Пн — свободное время · Ср — миф или правда · Пт — врач или акция'];
+var PLAN_EXTRA='Вт и Чт — по желанию опрос прямо в ВК, в любой день — истории со свободным временем';
+/* a 53-week year shifts the rotation by one week once; that is fine for a posting plan */
+function isoWeek(d){var t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);var y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/864e5+1)/7);}
+function planWeek(d){return isoWeek(d)%2?0:1;}
+function planToday(){var d=new Date();return PLAN[planWeek(d)][d.getDay()];}
+
+/* medical services ads need this warning (ФЗ «О рекламе», ст. 24 ч. 7) on at least 5% of the image area */
+var WARN_TPL={promo:1,price:1,product:1};
+var WARN_TEXT='Имеются противопоказания. Необходима консультация специалиста.';
+var WARN_SHARE=.06;
+
+var MYTH_DEFAULT='Миф: Если зуб не болит, лечить его не нужно\nПравда: Кариес на ранней стадии не болит. Чем раньше его вылечить, тем проще и дешевле лечение.\n\nМиф: Молочные зубы можно не лечить — всё равно выпадут\nПравда: Кариес молочного зуба может навредить зачатку постоянного. Молочные зубы тоже нужно лечить.\n\nМиф: Отбеливание портит эмаль\nПравда: Профессиональное отбеливание под контролем врача безопасно для здоровой эмали. Перед процедурой нужна консультация.\n\nМиф: Жёсткая щётка чистит лучше\nПравда: Жёсткая щётка может травмировать эмаль и дёсны. Большинству подходит щётка средней жёсткости.\n\nМиф: Профчистка нужна, только когда есть камень\nПравда: Профгигиену рекомендуют раз в полгода: она убирает налёт, с которым не справляется обычная щётка.';
+/* «Миф: …» starts a card, «Правда: …» fills it, other lines continue the previous field; the title makes a cover card */
+function mythPages(){
+  var d=S.myth,pages=[],cur=null,field='m';
+  if((d.title||'').trim())pages.push({cover:true});
+  String(d.text||'').split('\n').forEach(function(l){
+    l=l.trim();if(!l)return;
+    var m=/^миф\s*:\s*(.*)$/i.exec(l),t=/^правда\s*:\s*(.*)$/i.exec(l);
+    if(m){cur={m:m[1],t:''};pages.push(cur);field='m';return;}
+    if(!cur){cur={m:'',t:''};pages.push(cur);}
+    if(t){cur.t=t[1];field='t';return;}
+    cur[field]=(cur[field]?cur[field]+' ':'')+l;
+  });
+  return pages;
+}
+
 
 var PRICE_DEFAULT='# Детская стоматология\n## Лечение зубов\nКариес молочного зуба — 3000 ₽\nЛечение пульпита молочного зуба — 3000–3500 ₽\nЛечение пульпита постоянного зуба — 5000–10 000 ₽\nПрофгигиена — 2500–3000 ₽\n## Удаление\nУдаление молочного зуба — 2500–3000 ₽\n# Лечение зубов\n## Взрослый приём\nКариес — 4000–5000 ₽\nЛечение пульпита — 5000–10 000 ₽\nРеставрация — 6000–8000 ₽\nПрофгигиена — 4000 ₽\nАкция 1+1 — 7000 ₽\n# Удаление зубов\n## Взрослый приём\nПростое удаление — 3000–4000 ₽\nСложное удаление — 5000–7000 ₽\nУдаление зуба мудрости — 7000–10 000 ₽\n# Протезирование\n## Коронки и протезы\nМеталлокерамика — 15 000 ₽\nБезметалловая керамика — 30 000 ₽\nСъёмный протез — 25 000–30 000 ₽\n# Имплантация\n## Акция\nУстановка импланта Osstem (Корея) — 24 990 ₽\n* Цена по акции до 31 декабря 2026. Полная стоимость рассчитывается после КТ-диагностики. Имеются противопоказания, необходима консультация специалиста.\n# Отбеливание\n## Акция\nОтбеливание системой Flash — 25 000 ₽\n* Цена по акции до 31 декабря 2026.';
 /* parse price text into pages: [{title, sections:[{name, rows:[{n,p}], notes:[]}]}] */
+/* services for the VK «Товары» section: price is what the card shows, vk is the number for VK's price field */
+var PRODUCTS_DEFAULT=[
+ {cat:'Лечение зубов',name:'Лечение кариеса',price:'от 4000 ₽',note:'4000–5000 ₽ в зависимости от сложности',text:'Лечим кариес под местной анестезией и ставим светоотверждаемую пломбу. Точную стоимость врач назовёт после осмотра.'},
+ {cat:'Лечение зубов',name:'Лечение пульпита',price:'от 5000 ₽',note:'5000–10 000 ₽, зависит от числа каналов',text:'Лечение воспалённого нерва зуба: обработка и пломбирование каналов, восстановление зуба пломбой.'},
+ {cat:'Эстетика',name:'Художественная реставрация',price:'от 6000 ₽',note:'6000–8000 ₽',text:'Восстанавливаем форму и цвет зуба композитом: сколы, промежутки между зубами, разрушенные края.'},
+ {cat:'Гигиена',name:'Профессиональная гигиена',price:'4000 ₽',note:'Для взрослых',text:'Снятие зубного камня ультразвуком, чистка Air Flow, полировка и фторирование. Рекомендуем раз в полгода.'},
+ {cat:'Акция',name:'Акция 1+1',price:'7000 ₽',note:'Подробности уточняйте по телефону',text:'Подробности акции уточняйте у администратора по телефону.'},
+ {cat:'Детская стоматология',name:'Лечение кариеса молочного зуба',price:'3000 ₽',note:'Детский приём',text:'Бережно лечим молочные зубы. Детский врач найдёт подход даже к самым маленьким пациентам.'},
+ {cat:'Детская стоматология',name:'Лечение пульпита у детей',price:'от 3000 ₽',note:'Молочный зуб 3000–3500 ₽, постоянный 5000–10 000 ₽',text:'Лечение воспалённого нерва молочного или постоянного зуба у ребёнка.'},
+ {cat:'Детская стоматология',name:'Детская профгигиена',price:'от 2500 ₽',note:'2500–3000 ₽',text:'Чистка зубов ребёнку и урок правильной чистки дома.'},
+ {cat:'Детская стоматология',name:'Удаление молочного зуба',price:'от 2500 ₽',note:'2500–3000 ₽',text:'Удаление молочного зуба под местной анестезией.'},
+ {cat:'Удаление зубов',name:'Удаление зуба',price:'от 3000 ₽',note:'Простое 3000–4000 ₽, сложное 5000–7000 ₽',text:'Удаление зуба у взрослых под местной анестезией. Сложность врач оценит на осмотре.'},
+ {cat:'Удаление зубов',name:'Удаление зуба мудрости',price:'от 7000 ₽',note:'7000–10 000 ₽',text:'Удаление зуба мудрости у хирурга, в том числе ретинированного и дистопированного.'},
+ {cat:'Протезирование',name:'Металлокерамическая коронка',price:'15 000 ₽',note:'За одну коронку',text:'Прочная коронка на металлическом каркасе с керамическим покрытием.'},
+ {cat:'Протезирование',name:'Безметалловая коронка',price:'30 000 ₽',note:'Керамика без металла, за одну коронку',text:'Эстетичная коронка без металла: пропускает свет как живой зуб.'},
+ {cat:'Протезирование',name:'Съёмный протез',price:'от 25 000 ₽',note:'25 000–30 000 ₽',text:'Съёмный протез при отсутствии нескольких или всех зубов.'},
+ {cat:'Имплантация · акция',name:'Имплант Osstem (Корея)',price:'24 990 ₽',note:'Цена по акции до 31 декабря 2026',text:'Установка импланта Osstem (Корея). Полная стоимость рассчитывается после КТ-диагностики. Имеются противопоказания, необходима консультация специалиста.'},
+ {cat:'Отбеливание · акция',name:'Отбеливание Flash',price:'25 000 ₽',note:'Цена по акции до 31 декабря 2026',text:'Кабинетное отбеливание системой Flash. Перед процедурой нужна консультация и профессиональная гигиена.'}
+];
+function cloneProducts(){return PRODUCTS_DEFAULT.map(function(p){return Object.assign({},p);});}
+/* VK's price field takes one number: the first one on the card */
+function vkPrice(p){var m=/\d[\d\s]*/.exec(p.price||'');return m?m[0].replace(/\s/g,''):'';}
+
 function pricePages(){
   var pages=[],pg=null,sc=null;
   function newPage(){pg={title:'',sections:[]};pages.push(pg);sc=null;}
@@ -330,16 +396,22 @@ var S={
  tip:{label:'Совет врача',title:'Чистим зубы правильно',text:'Чистите зубы два раза в день по две минуты и не забывайте про зубную нить: она убирает налёт там, куда щётка не достаёт.'},
  price:{badge:'Цены с ноября 2026',text:PRICE_DEFAULT,page:0},
  cover:{tagline:'Семейная стоматология для взрослых и детей',phones:true},
+ product:{items:cloneProducts(),i:0},
+ photo:{label:'За кадром',title:'Готовим кабинет к приёму',text:'Стерилизуем инструменты и проверяем оборудование перед каждым пациентом.',px:50,py:50,zoom:100},
+ myth:{title:'Мифы о зубах',sub:'Разбираем с нашими врачами',text:MYTH_DEFAULT,page:0},
+ dark:{tip:false,myth:true},
  avatar:{}
 };
 var KEY='zhemchug-site-v1';
 try{var raw=localStorage.getItem(KEY); if(raw){var sv=JSON.parse(raw);
   ['fmt','tpl'].forEach(function(k){if(sv[k])S[k]=sv[k];});
-  ['clinic','bgPick','free','promo','doc','tip','price','cover'].forEach(function(k){if(sv[k])Object.assign(S[k],sv[k]);});
+  ['clinic','bgPick','free','promo','doc','tip','price','cover','product','photo','myth','dark'].forEach(function(k){if(sv[k])Object.assign(S[k],sv[k]);});
 }}catch(e){}
 /* old saved address had a wrong office list */
 if(S.clinic.addr2==='офисы 15, 17, 29')S.clinic.addr2='офисы 15, 17, 20, 29';
 if(!tplInfo(S.tpl))S.tpl='free';
+if(!S.product.items||!S.product.items.length)S.product.items=cloneProducts();
+function curProduct(){var p=S.product;if(!(p.i<p.items.length))p.i=0;return p.items[p.i];}
 var saveT=0;
 function persist(){clearTimeout(saveT);saveT=setTimeout(function(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}},300);}
 
@@ -361,6 +433,7 @@ function bgImage(id,cb){
   return im;
 }
 function bgFor(tpl,fmt){
+  if(isDark(tpl)) return DARK_SRC[fmt];
   var pick=S.bgPick[tpl+'_'+fmt];
   if(pick) return pick;
   if(tpl==='free'&&S.free.spec==='Детский доктор') return KIDS_BG[fmt];
@@ -378,16 +451,18 @@ function plate(c,x,y,w,h,r,fill,shadow,stroke){
   rr(c,x,y,w,h,r);c.fillStyle=fill;c.fill();c.restore();
   if(stroke){c.save();rr(c,x,y,w,h,r);c.strokeStyle=stroke;c.lineWidth=2;c.stroke();c.restore();}
 }
+/* words for line breaking: a one- or two-letter word stays with the next one («о зубах», «и детей») */
+function words(t){var L='[A-Za-zА-Яа-яЁё]{1,2}';return String(t||'').replace(new RegExp('(^|[ \\t\\n])('+L+') +(?=\\S)','g'),'$1$2\u00A0').replace(new RegExp('(\u00A0)('+L+') +(?=\\S)','g'),'$1$2\u00A0').split(/[ \t\n]+/).filter(Boolean);}
 function wrap(c,text,maxW){
   var out=[];String(text||'').split('\n').forEach(function(par){
-    var words=par.split(/\s+/).filter(Boolean),line='';
-    words.forEach(function(w){var t=line?line+' '+w:w;if(!line||c.measureText(t).width<=maxW)line=t;else{out.push(line);line=w;}});
+    var words_=words(par),line='';
+    words_.forEach(function(w){var t=line?line+' '+w:w;if(!line||c.measureText(t).width<=maxW)line=t;else{out.push(line);line=w;}});
     if(line)out.push(line);});
   return out;
 }
 function fitSize(c,text,size,weight,maxW){
-  var words=String(text||'').split(/\s+/).filter(Boolean);
-  function widest(){setFont(c,weight,size);var m=0;words.forEach(function(w){m=Math.max(m,c.measureText(w).width);});return m;}
+  var ws=words(text);
+  function widest(){setFont(c,weight,size);var m=0;ws.forEach(function(w){m=Math.max(m,c.measureText(w).width);});return m;}
   while(widest()>maxW&&size>26)size-=3; return size;
 }
 function head(c,text,cy,size,color,weight,maxW){
@@ -445,9 +520,9 @@ function drawFooter(c,H,st){
   var h=0;items.forEach(function(it,i){h+=2+gap+(it==='a'?aH:pH)+(i<items.length-1?gap:0);});
   var y=H-bm-h,top=y,dw=W*.6;
   items.forEach(function(it){
-    c.save();c.fillStyle='rgba(22,51,91,.55)';c.fillRect(M,y,dw,2);c.restore();y+=2+gap;
+    c.save();c.fillStyle=rule(.55);c.fillRect(M,y,dw,2);c.restore();y+=2+gap;
     var ih=it==='a'?aH:pH,cy=y+ih/2;
-    c.beginPath();c.arc(M+cd/2,cy,cd/2,0,Math.PI*2);c.fillStyle='rgba(205,225,245,.95)';c.fill();c.textAlign='left';
+    c.beginPath();c.arc(M+cd/2,cy,cd/2,0,Math.PI*2);c.fillStyle=DARK?'rgba(255,255,255,.14)':'rgba(205,225,245,.95)';c.fill();c.textAlign='left';
     if(it==='a'){
       iconPath(c,P_PIN,M+cd/2-cd*.24,cy-cd*.24,cd*.48,COL.ink,true);
       var fs=mf;setFont(c,700,fs);while(c.measureText(a1).width>avail+120&&fs>22){fs-=2;setFont(c,700,fs);}
@@ -461,6 +536,58 @@ function drawFooter(c,H,st){
     y+=ih+gap;
   });
   return top;
+}
+
+/* dark look = the same nacre photos, gradient-mapped into the brand navy offline (tools/mkdark.py),
+   so it keeps the silk sheen of the light templates */
+var DARK_SRC={story:'story_dark_v1',post:'post_dark_v1'};
+function darkBg(c,w,h,img){
+  if(img&&img.complete&&img.naturalWidth){coverImg(c,img,0,0,w,h);return;}
+  var g=c.createLinearGradient(0,0,w*.5,h);g.addColorStop(0,'#24497C');g.addColorStop(1,'#0E2445');c.fillStyle=g;c.fillRect(0,0,w,h);
+}
+/* full-width band, quiet on purpose: the law asks for the area, not for contrast. One line when it fits, else two */
+function warnBand(c,w,y,bh){
+  c.fillStyle='rgba(255,255,255,.78)';c.fillRect(0,y,w,bh);
+  c.fillStyle='rgba(22,51,91,.14)';c.fillRect(0,y,w,2);
+  var mw=w-96,fs=Math.floor(bh*.34),lines=[WARN_TEXT];
+  setFont(c,600,fs);
+  if(c.measureText(WARN_TEXT).width>mw){
+    var one=fs;while(c.measureText(WARN_TEXT).width>mw&&one>20){one--;setFont(c,600,one);}
+    if(one>=Math.floor(bh*.26))fs=one;
+    else{var half=WARN_TEXT.indexOf(' Необходима');lines=[WARN_TEXT.slice(0,half),WARN_TEXT.slice(half+1)];fs=Math.floor(bh*.3);setFont(c,600,fs);
+      while(lines.some(function(l){return c.measureText(l).width>mw;})&&fs>16){fs--;setFont(c,600,fs);}}
+  }
+  setFont(c,600,fs);c.fillStyle=LIGHT_COL.soft;c.textAlign='center';
+  var lh=fs*1.3,y0=y+bh/2-lh*lines.length/2;
+  lines.forEach(function(l,i){c.fillText(l,w/2,y0+i*lh+fs*1.0);});
+  return bh;
+}
+function logoW(c,k,st){var fs=(st?84:72)*k;setFont(c,600,fs);ls(c,fs*.22);var tw=c.measureText('ЖЕМЧУГ').width-fs*.22;ls(c,0);return (st?46:40)*k*2+22*k+tw;}
+/* the photo stays in memory only: it is too big for localStorage */
+var PHOTO=null;
+function drawPhoto(c,w,h,st,fmt){
+  var d=S.photo;
+  if(PHOTO){var z=Math.max(1,(d.zoom||100)/100),r=Math.max(w/PHOTO.naturalWidth,h/PHOTO.naturalHeight)*z,dw=PHOTO.naturalWidth*r,dh=PHOTO.naturalHeight*r;
+    c.drawImage(PHOTO,(w-dw)*(d.px/100),(h-dh)*(d.py/100),dw,dh);}
+  else{grad(c,w,h);var bg=bgImage(DEFAULT_BG.photo[fmt]);if(bg.complete&&bg.naturalWidth)coverImg(c,bg,0,0,w,h);
+    setFont(c,700,st?56:48);c.fillStyle=COL.soft;c.textAlign='center';c.fillText('Здесь будет ваше фото',w/2,h*.45);}
+  /* logo on a white pill at the top; stories keep clear of VK's top bar */
+  var k=st?.62:.6,lw=logoW(c,k,st)+64*k*1.6,lh=(st?84:72)*k*.78+(st?50:42)*k+10*k,ph=lh+54*k,top=st?150:44;
+  plate(c,w/2-lw/2,top,lw,ph,ph/2,'rgba(255,255,255,.9)',true,'rgba(255,255,255,.95)');logo(c,w/2,top+30*k,k,st);
+  /* caption plate at the bottom, above VK's reply bar in stories */
+  var pad=st?44:36,iw=w-2*M-pad*2,ts=st?66:56,xs=st?36:32,ph1=S.clinic.show?(S.clinic.ph1||'').trim():'';
+  var tl=[];if(d.title){for(;ts>=40;ts-=2){setFont(c,800,ts);tl=wrap(c,d.title,iw);if(tl.length<=3)break;}
+    if(tl.length>3){tl=tl.slice(0,3);tl[2]=tl[2].replace(/[\s,.;:]*$/,'')+'…';}}
+  setFont(c,500,xs);var xl=d.text?wrap(c,d.text,iw).slice(0,4):[];
+  var bodyH=(d.label?(st?26:24)*1.7:0)+tl.length*ts*1.1+(xl.length?(tl.length?16:0)+xl.length*xs*1.38:0)+(ph1?(tl.length||xl.length?26:0)+44:0);
+  if(!bodyH)return;
+  var bh=bodyH+pad*2,by=h-(st?250:M)-bh,y=by+pad;
+  plate(c,M,by,w-2*M,bh,st?40:34,'rgba(255,255,255,.92)',true,'rgba(255,255,255,.95)');
+  c.textAlign='left';
+  if(d.label){var lf=st?26:24;setFont(c,800,lf);ls(c,5);c.fillStyle=LIGHT_COL.steel;c.fillText(d.label.toUpperCase(),M+pad,y+lf*.85);ls(c,0);y+=lf*1.7;}
+  setFont(c,800,ts);c.fillStyle=LIGHT_COL.ink;tl.forEach(function(l){c.fillText(l,M+pad,y+ts*.82);y+=ts*1.1;});
+  if(xl.length){if(tl.length)y+=16;setFont(c,500,xs);xl.forEach(function(l){c.fillText(l,M+pad,y+xs*.95);y+=xs*1.38;});}
+  if(ph1){if(tl.length||xl.length)y+=26;var isz=34;iconPath(c,P_PHONE,M+pad,y+5,isz,LIGHT_COL.steel);setFont(c,700,32);c.fillStyle=LIGHT_COL.ink;c.fillText('Запись: '+ph1,M+pad+isz+14,y+33);}
 }
 
 /* ================= TEMPLATES ================= */
@@ -549,7 +676,27 @@ var TPL={
   cy=head(c,d.title,cy,(st?116:98)*sc,COL.ink,800);
   if(d.text){cy+=(st?28:20)*sc;cy=accent(c,cy,sc)+(st?32:22)*sc;
     var fs=40*sc;setFont(c,500,fs);var lines=wrap(c,d.text,CW-104*sc),lh=fs*1.46,pad=46*sc,h=lines.length*lh+pad*2-fs*.3;
-    plate(c,M,cy,CW,h,44*sc,'rgba(255,255,255,.84)',true,'rgba(255,255,255,.95)');
+    plate(c,M,cy,CW,h,44*sc,plateFill(),true,plateEdge());
+    c.fillStyle=COL.ink;c.textAlign='left';lines.forEach(function(t,i){c.fillText(t,M+52*sc,cy+pad+fs*.8+i*lh);});cy+=h;}
+  return cy;
+ },
+ myth:function(c,y,sc,st){
+  var d=S.myth,pages=mythPages(),pg=pages[Math.min(d.page||0,pages.length-1)],cy=y;
+  if(!pg)return cy;
+  if(pg.cover){
+    cy=badge(c,'Миф или правда',cy,sc)+(st?40:26)*sc;
+    cy=head(c,d.title,cy,(st?136:116)*sc,COL.ink,800);
+    if(d.sub){cy+=(st?20:14)*sc;cy=head(c,d.sub,cy,(st?54:46)*sc,COL.steel,700);}
+    cy+=(st?44:30)*sc;cy=accent(c,cy,sc)+(st?36:26)*sc;
+    setFont(c,600,40*sc);c.fillStyle=COL.soft;c.textAlign='left';c.fillText('Листайте карточки →',M,cy+34*sc);
+    return cy+48*sc;
+  }
+  cy=badge(c,'Миф',cy,sc)+(st?32:22)*sc;
+  if(pg.m)cy=head(c,'«'+pg.m+'»',cy,(st?84:72)*sc,COL.ink,800);
+  if(pg.t){cy+=(st?40:28)*sc;
+    setFont(c,800,26*sc);ls(c,5*sc);c.fillStyle=COL.steel;c.textAlign='left';c.fillText('ПРАВДА',M+4*sc,cy+24*sc);ls(c,0);cy+=48*sc;
+    var fs=42*sc;setFont(c,500,fs);var lines=wrap(c,pg.t,CW-104*sc),lh=fs*1.42,pad=46*sc,h=lines.length*lh+pad*2-fs*.3;
+    plate(c,M,cy,CW,h,44*sc,plateFill(),true,plateEdge());
     c.fillStyle=COL.ink;c.textAlign='left';lines.forEach(function(t,i){c.fillText(t,M+52*sc,cy+pad+fs*.8+i*lh);});cy+=h;}
   return cy;
  },
@@ -598,27 +745,66 @@ function pill(c,cx,y,text,ic,k,fill){
 }
 function pillW(c,text,ic,k){setFont(c,700,34*k);return c.measureText(text).width+(ic?34*k+20*k:0)+56*k;}
 var GDRAW={
- /* VK shows the cover at 3:1 on desktop with the top cut off, and crops the sides on phones: keep content low and in the middle ~1100px */
+ /* Safe zone, measured in VK (canvas px): desktop shows the bottom 3:1, so y<130 is cut. The mobile site shows the full
+    width at ~390px; its round buttons cover x<270 and x>1620 for y<260, the avatar covers x 75–575 for y>500,
+    and only the last ~20px are hidden. Text is sized to stay readable at 390px. */
  cover:function(c,w,h){
   grad(c,w,h);var img=bgImage('post_soft_nacre_v1');
   if(img.complete&&img.naturalWidth)fitBottom(c,img,0,0,w,h);
-  var tray=bgImage('story_tray_right_v2');
-  if(tray.complete&&tray.naturalWidth){
-    /* tray sits at the right edge of the story background: crop it into the cover's right side */
-    var sw=tray.width*.5,sh=tray.height*.42,sx0=tray.width-sw,sy0=tray.height*.40,dw=h*sw/sh*1.02,dx=w-dw;
-    var off=document.createElement('canvas');off.width=Math.round(dw);off.height=h;var o=off.getContext('2d');
-    o.drawImage(tray,sx0,sy0,sw,sh,0,0,dw,h);
-    o.globalCompositeOperation='destination-in';var fg=o.createLinearGradient(0,0,dw,0);fg.addColorStop(0,'rgba(0,0,0,0)');fg.addColorStop(.45,'rgba(0,0,0,1)');o.fillStyle=fg;o.fillRect(0,0,dw,h);
-    c.drawImage(off,dx,0);
-  }
-  var cx=w/2,k=1.4,d=S.cover,y=logo(c,cx,172,k,false);
-  if(d.tagline){var fs=46;setFont(c,600,fs);c.fillStyle=COL.soft;c.textAlign='center';c.fillText(d.tagline,cx,y+70);y+=70;}
-  if(d.phones){
-    var k2=1.0,k3=S.clinic,a=[(k3.addr1||'').trim(),P_PIN],ps=[k3.ph1,k3.ph2].map(function(s){return (s||'').trim();}).filter(Boolean).map(function(p){return [p,P_PHONE];});
-    var row1=a[0]?[a]:[],row2=ps,yy=y+56;
-    [row1,row2].forEach(function(row){if(!row.length)return;var gap=20,tot=-gap;row.forEach(function(it){tot+=pillW(c,it[0],it[1],k2)+gap;});
-      var x=cx-tot/2;row.forEach(function(it){var pw=pillW(c,it[0],it[1],k2);pill(c,x+pw/2,yy,it[0],it[1],k2);x+=pw+gap;});yy+=72*k2+18;});
-  }
+  var d=S.cover,k3=S.clinic,
+      a1=(k3.addr1||'').trim(),a2=(k3.addr2||'').trim(),
+      ps=[k3.ph1,k3.ph2].map(function(s){return (s||'').trim();}).filter(Boolean),
+      card=d.phones&&(a1||ps.length),cx=card?690:w/2;
+  /* left: logo + tagline, kept above the mobile avatar */
+  var setTag=function(){setFont(c,600,52);},tl=[];
+  if(d.tagline){setTag();tl=wrap(c,d.tagline,card?700:1300);}
+  var top=card?150:Math.max(150,300-(162+(tl.length?30+tl.length*66:0))/2),y=logo(c,cx,top,1.5,false)+30;
+  if(tl.length){setTag();c.fillStyle=COL.soft;c.textAlign='center';tl.forEach(function(l){c.fillText(l,cx,y+52*.8);y+=66;});}
+  if(!card)return;
+  /* right: white card with address and phones, below the mobile menu button */
+  var x0=1090,cw=700,pad=40,isz=50,tx=x0+pad+isz+24,tw=x0+cw-pad-tx;
+  function fit(t,wt,sz){setFont(c,wt,sz);while(c.measureText(t).width>tw&&sz>30){sz-=2;setFont(c,wt,sz);}return sz;}
+  var rows=[];
+  if(a1)rows.push({ic:P_PIN,t:a1,wt:700,sz:fit(a1,700,44),sub:a2,h:a2?100:60});
+  ps.forEach(function(p){rows.push({ic:P_PHONE,t:p,wt:800,sz:fit(p,800,60),h:72});});
+  var gap=28,ch=pad*2+rows.reduce(function(s,r){return s+r.h;},0)+gap*(rows.length-1),y0=Math.max(300,490-ch/2);
+  plate(c,x0,y0,cw,ch,40,'rgba(255,255,255,.86)',true,'rgba(255,255,255,.95)');
+  var yy=y0+pad;
+  rows.forEach(function(r,i){
+    if(i){c.save();c.fillStyle='rgba(22,51,91,.12)';c.fillRect(x0+pad,yy-gap/2-1,cw-pad*2,2);c.restore();}
+    var base=yy+r.sz*.78+(r.sub?0:(r.h-r.sz)/2-r.sz*.06);
+    iconPath(c,r.ic,x0+pad,base-r.sz*.36-isz/2,isz,COL.steel,r.ic===P_PIN);
+    setFont(c,r.wt,r.sz);c.fillStyle=COL.ink;c.textAlign='left';c.fillText(r.t,tx,base);
+    if(r.sub){var sz=fit(r.sub,500,36);setFont(c,500,sz);c.fillStyle=COL.soft;c.fillText(r.sub,tx,base+48);}
+    yy+=r.h+gap;
+  });
+ },
+ /* VK shows product photos as small squares: few, large elements */
+ product:function(c,w,h){
+  grad(c,w,h);var img=bgImage('post_soft_nacre_v1');
+  if(img.complete&&img.naturalWidth)fitBottom(c,img,-w*.1,0,w*1.2,h);
+  var p=curProduct()||{},cx=w/2,mw=w-280;
+  logo(c,cx,64,.9,false);
+  /* name: two lines if it fits at a readable size, otherwise three */
+  var sz,lines,fits=function(n,min){for(sz=104;sz>=min;sz-=4){setFont(c,800,sz);lines=wrap(c,p.name||'',mw);if(lines.length<=n&&!lines.some(function(l){return c.measureText(l).width>mw;}))return true;}return false;};
+  if(!fits(2,76))fits(3,60);
+  /* note: up to two lines rather than one squeezed line */
+  var ns=36,nl=[];
+  if(p.note){for(;ns>=28;ns-=2){setFont(c,500,ns);nl=wrap(c,p.note,mw-100);if(nl.length<=2&&!nl.some(function(l){return c.measureText(l).width>mw-100;}))break;}}
+  /* two note lines: split where both halves are closest in width, so no word hangs alone */
+  if(nl.length===2){var ws=words(p.note),best=null;for(var k=1;k<ws.length;k++){var l1=ws.slice(0,k).join(' '),l2=ws.slice(k).join(' '),m=Math.max(c.measureText(l1).width,c.measureText(l2).width);if(!best||m<best.m)best={m:m,l:[l1,l2]};}if(best)nl=best.l;}
+  var lh=sz*1.08,cat=(p.cat||'').toUpperCase(),catH=cat?70:0,nameH=lines.length*lh,
+      priceH=p.price?190:0,noteH=nl.length?14+nl.length*ns*1.32:0,gap=44,tot=catH+nameH+(priceH?gap+priceH:0)+noteH,y=Math.max(205,550-tot/2);
+  if(cat){setFont(c,800,32);ls(c,5);c.fillStyle=COL.steel;c.textAlign='center';c.fillText(cat,cx+2.5,y+30);ls(c,0);y+=catH;}
+  setFont(c,800,sz);c.fillStyle=COL.ink;c.textAlign='center';lines.forEach(function(l){c.fillText(l,cx,y+sz*.8);y+=lh;});
+  if(p.price){y+=gap;var ps=120;setFont(c,800,ps);while(c.measureText(p.price).width>mw-120&&ps>60){ps-=6;setFont(c,800,ps);}
+    var pw=c.measureText(p.price).width+140;plate(c,cx-pw/2,y,pw,priceH,priceH/2,'rgba(255,255,255,.9)',true,'rgba(255,255,255,.95)');
+    c.fillStyle=COL.ink;c.fillText(p.price,cx,y+priceH/2+ps*.36);y+=priceH;}
+  if(nl.length){setFont(c,500,ns);c.fillStyle=COL.soft;y+=14;nl.forEach(function(l){c.fillText(l,cx,y+ns*1.05);y+=ns*1.32;});}
+  var bh=Math.round(h*WARN_SHARE),pb=h-bh-44,ph=(S.clinic.ph1||'').trim();
+  warnBand(c,w,h-bh,bh);
+  if(ph){setFont(c,700,38);var t='Запись: '+ph,tw=c.measureText(t).width,isz=38,x=cx-(tw+isz+16)/2;
+    iconPath(c,P_PHONE,x,pb-isz*.86,isz,COL.steel);c.fillStyle=COL.ink;c.textAlign='left';c.fillText(t,x+isz+16,pb);}
  },
  avatar:function(c,w,h){
   grad(c,w,h);var img=bgImage('post_soft_nacre_v1');
@@ -636,16 +822,23 @@ var scratch=document.createElement('canvas');scratch.width=W;scratch.height=3600
 function render(canvas,tpl,fmt){
   var gt=groupTpl(tpl);
   if(gt){canvas.width=gt.w;canvas.height=gt.h;var gc=canvas.getContext('2d');gc.textBaseline='alphabetic';GDRAW[tpl](gc,gt.w,gt.h);return;}
-  var H=FORMATS[fmt].h,st=fmt==='story',id=bgFor(tpl,fmt),meta=bgMeta(id),img=bgImage(id);
+  var H=FORMATS[fmt].h,st=fmt==='story',dark=isDark(tpl),id=bgFor(tpl,fmt),meta=dark?{right:.94}:bgMeta(id),img=bgImage(id);
   canvas.width=W;canvas.height=H;var c=canvas.getContext('2d');c.textBaseline='alphabetic';
-  var g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#F4F9FD');g.addColorStop(1,'#D9EAF8');c.fillStyle=g;c.fillRect(0,0,W,H);
-  if(img.complete&&img.naturalWidth)coverImg(c,img,0,0,W,H);
+  if(tpl==='photo'){drawPhoto(c,W,H,st,fmt);return;}
+  setTheme(dark);
+  try{
+  if(dark)darkBg(c,W,H,img);
+  else{grad(c,W,H);if(img.complete&&img.naturalWidth)coverImg(c,img,0,0,W,H);}
   CW=Math.round(W*(meta.right||.94))-M;
   var hb=drawHeader(c,(st?104:62)+(meta.top||0)*H,st);
-  var ft=drawFooter(c,H,st);
+  /* the warning band sits at the bottom of posts and above VK's reply bar in stories; the footer moves above it */
+  var floor=H;
+  if(WARN_TPL[tpl]){var bh=Math.round(H*WARN_SHARE);floor=H-(st?190:0)-bh;warnBand(c,W,floor,bh);floor-=st?36:22;floor+=st?112:76;}
+  var ft=drawFooter(c,floor,st);
   var top=hb+(st?60:34),bottom=ft-(st?50:26),avail=bottom-top,T=TPL[tpl],sc=1,h=0;
   for(var i=0;i<SCALES.length;i++){sc=SCALES[i];sx.clearRect(0,0,W,3600);h=T(sx,0,sc,st);if(h<=avail)break;}
   T(c,top+Math.max(0,(avail-h)*(st?.38:.3)),sc,st);
+  }finally{setTheme(false);}
 }
 
 /* ================= UI ================= */
@@ -668,9 +861,9 @@ function show(v){
 /* gallery */
 function drawGallery(){
   document.querySelectorAll('#gFmt button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.fmt===S.fmt));});
-  var plan=PLAN[new Date().getDay()];
-  $('#planToday').textContent=plan?'Сегодня по плану: '+plan.text+'.':'Сегодня по плану: история со свободным временем.';
-  $('#planWeek').textContent=PLAN_WEEK;
+  var plan=planToday(),wk=planWeek(new Date());
+  $('#planToday').textContent='Неделя '+(wk+1)+'. '+(plan?'Сегодня по плану: '+plan.text+'.':'Сегодня по плану: история со свободным временем.');
+  $('#planWeek').textContent=PLAN_WEEK.join('\n')+'\n'+PLAN_EXTRA;
   var grid=$('#tgrid');grid.innerHTML='';
   TEMPLATES.forEach(function(t){
     var cvs=el('canvas',{width:W,height:FORMATS[S.fmt].h,'aria-hidden':'true'});
@@ -683,7 +876,7 @@ function drawGallery(){
   var gg=$('#ggrid');gg.innerHTML='';
   GROUP.forEach(function(t){
     var cvs=el('canvas',{width:t.w,height:t.h,'aria-hidden':'true'});
-    gg.appendChild(el('button',{type:'button','class':'tcard',on:{click:function(){S.tpl=t.id;show('editor');}}},[cvs,el('b',{text:t.name}),el('span',{text:t.desc})]));
+    gg.appendChild(el('button',{type:'button','class':'tcard'+(t.w===t.h?' sq':''),on:{click:function(){S.tpl=t.id;show('editor');}}},[cvs,el('b',{text:t.name}),el('span',{text:t.desc})]));
     var paint=function(){render(cvs,t.id,S.fmt);};
     paint();bgImage('post_soft_nacre_v1',paint);bgImage('story_tray_right_v2',paint);
   });
@@ -703,9 +896,11 @@ function fmtSection(){
   [['story','История 9:16'],['post','Пост 4:5']].forEach(function(p){
     seg.appendChild(el('button',{type:'button','aria-pressed':String(S.fmt===p[0]),text:p[1],on:{click:function(){S.fmt=p[0];buildForm();redraw();updDock();}}}));
   });
-  var strip=el('div',{'class':'bgs'});var cur=bgFor(S.tpl,S.fmt);
+  if(S.tpl==='photo')return sec('Формат',[seg]);
+  var strip=el('div',{'class':'bgs'}),cur=bgFor(S.tpl,S.fmt),dark=isDark(S.tpl);
+  if(S.tpl==='tip'||S.tpl==='myth')strip.appendChild(el('button',{type:'button','class':'dark','aria-pressed':String(dark),'aria-label':'Тёмный фон',style:'aspect-ratio:'+(S.fmt==='story'?'9/16':'4/5'),on:{click:function(){S.dark[S.tpl]=true;bgImage(DARK_SRC[S.fmt],redraw);buildForm();redraw();}}},[el('span',{text:'Тёмный'})]));
   BGS[S.fmt].forEach(function(b){
-    strip.appendChild(el('button',{type:'button','aria-pressed':String(b.id===cur),'aria-label':'Фон',on:{click:function(){S.bgPick[S.tpl+'_'+S.fmt]=b.id;bgImage(b.id,redraw);buildForm();redraw();}}},[el('img',{src:'thumb/'+b.id+'.jpg',alt:'',loading:'lazy'})]));
+    strip.appendChild(el('button',{type:'button','aria-pressed':String(!dark&&b.id===cur),'aria-label':'Фон',on:{click:function(){if(S.dark&&S.tpl in S.dark)S.dark[S.tpl]=false;S.bgPick[S.tpl+'_'+S.fmt]=b.id;bgImage(b.id,redraw);buildForm();redraw();}}},[el('img',{src:'thumb/'+b.id+'.jpg',alt:'',loading:'lazy'})]));
   });
   return sec('Формат и фон',[seg,strip]);
 }
@@ -752,9 +947,20 @@ function buildForm(){
     ph.appendChild(document.createTextNode(' Показывать адрес и телефоны'));
     var chk=ph.querySelector('input');chk.checked=!!cv2.phones;chk.addEventListener('change',function(){cv2.phones=chk.checked;redraw();});
     f.appendChild(sec('Текст',[textField('Строка под логотипом',cv2,'tagline'),ph]));
-    f.appendChild(sec('Как поставить',[el('p',{style:'margin:0',text:'Управление → Настройки → Обложка сообщества → Загрузить. Края на телефоне обрезаются, поэтому всё важное стоит в середине.'})]));
+    f.appendChild(sec('Как поставить',[el('p',{style:'margin:0',text:'Управление → Настройки → Обложка сообщества → Загрузить. На компьютере ВК срезает верх обложки, на телефоне — низ и углы под кнопками. Всё важное уже стоит в видимой зоне.'})]));
   }else if(S.tpl==='avatar'){
     f.appendChild(sec('Как поставить',[el('p',{style:'margin:0',text:'На странице группы нажмите на аватар → «Загрузить фотографию». Выделите весь квадрат, затем круг для миниатюры по центру.'})]));
+  }else if(S.tpl==='product'){
+    var pd=S.product,cur=curProduct();
+    var list=el('div',{'class':'chips',role:'group','aria-label':'Товар'});
+    pd.items.forEach(function(it,i){list.appendChild(el('button',{type:'button','class':'chip','aria-pressed':String(pd.i===i),text:(i+1)+'. '+(it.name||'Без названия'),on:{click:function(){pd.i=i;buildForm();redraw();}}}));});
+    var acts=el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},[
+      el('button',{type:'button','class':'small',text:'Добавить товар',on:{click:function(){pd.items.push({cat:'',name:'Новая услуга',price:'',note:'',text:''});pd.i=pd.items.length-1;buildForm();redraw();}}}),
+      el('button',{type:'button','class':'small',text:'Удалить этот',on:{click:function(){if(pd.items.length<2||!confirm('Удалить «'+(cur.name||'')+'»?'))return;pd.items.splice(pd.i,1);pd.i=0;buildForm();redraw();}}}),
+      el('button',{type:'button','class':'small',text:'Вернуть исходный список',on:{click:function(){if(!confirm('Вернуть исходный список товаров? Ваши правки пропадут.'))return;pd.items=cloneProducts();pd.i=0;buildForm();redraw();}}})]);
+    f.appendChild(sec('Товар',[list,acts]));
+    f.appendChild(sec('Карточка',[textField('Раздел',cur,'cat'),textField('Название',cur,'name',{onInput:function(){list.children[pd.i].textContent=(pd.i+1)+'. '+(cur.name||'Без названия');}}),textField('Цена на картинке',cur,'price'),textField('Пояснение под ценой',cur,'note'),textField('Описание',cur,'text',{area:true,rows:4})]));
+    f.appendChild(sec('Как добавить в ВК',[el('p',{style:'margin:0',text:'Товары → Добавить товар. Загрузите картинку, вставьте название и описание из блока ниже. В поле «Цена» — число из подсказки, категория — «Услуги». Похожие услуги объедините в подборку с названием раздела.'})]));
   }else if(S.tpl==='price'){
     var pr=S.price;if((pr.page||0)>=pricePages().length)pr.page=0;
     var pchips=el('div',{'class':'chips',role:'group','aria-label':'Страница'});
@@ -765,6 +971,29 @@ function buildForm(){
       textField('Прайс',pr,'text',{area:true,rows:16,onInput:function(){var n=pricePages().length;if((pr.page||0)>=n)pr.page=0;fillChips();}}),
       el('span',{style:'color:var(--muted);font-size:13px',text:'«# Заголовок» — новая страница с заголовком, «## Раздел» — раздел, «Услуга — цена» — строка, «* текст» — сноска мелким шрифтом, «---» — разрыв страницы.'}),
       el('button',{type:'button','class':'small',style:'align-self:flex-start',text:'Вернуть исходный прайс',on:{click:function(){pr.text=PRICE_DEFAULT;pr.page=0;buildForm();redraw();}}})]));
+  }else if(S.tpl==='photo'){
+    var ph=S.photo,file=el('input',{type:'file',accept:'image/*',id:'f-photo-file','class':'inp'});
+    file.addEventListener('change',function(){var f=file.files&&file.files[0];if(!f)return;
+      var url=URL.createObjectURL(f),im=new Image();
+      im.onload=function(){if(PHOTO)URL.revokeObjectURL(PHOTO.src);PHOTO=im;ph.px=50;ph.py=50;ph.zoom=100;buildForm();redraw();};
+      im.onerror=function(){URL.revokeObjectURL(url);toast('Не получилось открыть фото. Попробуйте JPG или PNG.');};
+      im.src=url;});
+    var slider=function(label,key,min,max){var id='f-photo-'+key,r=el('input',{type:'range',id:id,min:String(min),max:String(max),value:String(ph[key])});
+      r.addEventListener('input',function(){ph[key]=+r.value;redraw();});return el('div',{'class':'range'},[el('label',{'for':id,text:label}),r]);};
+    f.appendChild(sec('Фото',[el('div',{'class':'field'},[el('label',{'for':'f-photo-file',text:PHOTO?'Заменить фото':'Выберите фото'}),file]),
+      slider('Масштаб','zoom',100,250),slider('По горизонтали','px',0,100),slider('По вертикали','py',0,100),
+      el('span',{style:'color:var(--muted);font-size:13px',text:'Только свои фото: команда, кабинеты, оборудование. Пациентов — только с их письменного согласия. Фото не сохраняется в сервисе: после перезагрузки страницы выберите его снова.'})]));
+    f.appendChild(sec('Подпись',[textField('Рубрика',ph,'label'),textField('Заголовок',ph,'title'),textField('Текст (до 4 строк)',ph,'text',{area:true,rows:3})]));
+  }else if(S.tpl==='myth'){
+    var my=S.myth;if((my.page||0)>=mythPages().length)my.page=0;
+    var mchips=el('div',{'class':'chips',role:'group','aria-label':'Карточка'});
+    var fillM=function(){mchips.innerHTML='';mythPages().forEach(function(p,i){mchips.appendChild(el('button',{type:'button','class':'chip','aria-pressed':String((my.page||0)===i),text:(i+1)+'. '+(p.cover?'Обложка':(p.m||'Без мифа').slice(0,28)+((p.m||'').length>28?'…':'')),on:{click:function(){my.page=i;buildForm();redraw();}}}));});};
+    fillM();
+    f.appendChild(sec('Карточка',[mchips,el('span',{style:'color:var(--muted);font-size:13px',text:'Сохраните каждую карточку и выложите их одним постом: получится листаемая карусель.'})]));
+    f.appendChild(sec('Обложка',[textField('Заголовок (пусто — без обложки)',my,'title',{onInput:function(){var n=mythPages().length;if((my.page||0)>=n)my.page=Math.max(0,n-1);fillM();}}),textField('Подзаголовок',my,'sub')]));
+    f.appendChild(sec('Мифы',[textField('Мифы и правда',my,'text',{area:true,rows:14,onInput:function(){if((my.page||0)>=mythPages().length)my.page=0;fillM();}}),
+      el('span',{style:'color:var(--muted);font-size:13px',text:'«Миф: …» — новая карточка, «Правда: …» — ответ врача. Лучше 3–6 мифов.'}),
+      el('button',{type:'button','class':'small',style:'align-self:flex-start',text:'Вернуть примеры',on:{click:function(){if(!confirm('Вернуть примеры мифов? Ваш текст пропадёт.'))return;my.text=MYTH_DEFAULT;my.page=0;buildForm();redraw();}}})]));
   }else if(S.tpl==='free'){
     var d=S.free;
     f.appendChild(sec('Врач',[doctorPicker(d)]));
@@ -782,10 +1011,11 @@ function buildForm(){
   }else{
     var q=S.tip;f.appendChild(sec('Текст',[textField('Метка',q,'label'),textField('Заголовок',q,'title'),textField('Текст',q,'text',{area:true,rows:5})]));
   }
-  if(!groupTpl(S.tpl)){
+  if(!groupTpl(S.tpl)||S.tpl==='product'){
     var cap=el('textarea',{'class':'inp',id:'caption',rows:9,'aria-label':'Текст публикации'});
     var copy=el('button',{type:'button','class':'small',style:'align-self:flex-start',text:'Скопировать текст',on:{click:function(){copyText(cap.value);}}});
-    f.appendChild(sec('Текст к публикации',[cap,copy,el('span',{style:'color:var(--muted);font-size:13px',text:'Вставьте его в пост под картинкой: так пост лучше находят в поиске и ленте. Текст можно поправить перед копированием.'})]));
+    var hint=S.tpl==='product'?'Вставьте в поле «Описание» товара. Цена для поля «Цена»: '+(vkPrice(curProduct())||'—')+' ₽.':'Вставьте его в пост под картинкой: так пост лучше находят в поиске и ленте. Текст можно поправить перед копированием.';
+    f.appendChild(sec(S.tpl==='product'?'Описание товара':'Текст к публикации',[cap,copy,el('span',{style:'color:var(--muted);font-size:13px',text:hint})]));
   }
   updDock();updCaption();
 }
@@ -818,6 +1048,18 @@ function caption(){
   }else if(t==='tip'){var q=S.tip;
     parts.push((q.label?q.label+': ':'')+q.title);if(q.text)parts.push(q.text);
     parts.push('Остались вопросы? Запишитесь на консультацию — врач всё расскажет и покажет.');
+  }else if(t==='product'){var pp=curProduct()||{};
+    parts.push([pp.name+(pp.price?' — '+pp.price:''),pp.note].filter(Boolean).join('\n'));
+    if(pp.text)parts.push(pp.text);
+    parts.push(WARN_TEXT);
+    parts.push(contacts());
+    return parts.filter(Boolean).join('\n\n');
+  }else if(t==='photo'){var ph=S.photo;
+    parts.push([ph.label,ph.title].filter(Boolean).join(': '));if(ph.text)parts.push(ph.text);
+  }else if(t==='myth'){var my=S.myth;
+    parts.push('🦷 '+[my.title,my.sub].filter(Boolean).join('. ')+'. Листайте карточки 👉');
+    mythPages().forEach(function(p){if(!p.cover)parts.push('❌ Миф: '+p.m+(p.t?'\n✅ Правда: '+p.t:''));});
+    parts.push('Остались вопросы? Запишитесь на консультацию — врач всё расскажет.');
   }else if(t==='price'){
     parts.push('Цены в стоматологии «Жемчуг»'+(S.price.badge?' · '+S.price.badge.toLowerCase().replace(/^цены\s*/,''):'')+'. Листайте карточки 👉');
     pricePages().forEach(function(pg){var l=[];if(pg.title)l.push('🦷 '+pg.title.toUpperCase());
@@ -825,6 +1067,7 @@ function caption(){
       parts.push(l.join('\n'));});
     parts.push('Точную стоимость лечения врач назовёт после осмотра.');
   }
+  if(WARN_TPL[t])parts.push(WARN_TEXT);
   parts.push(contacts());
   if((S.clinic.tags||'').trim())parts.push(S.clinic.tags.trim());
   return parts.filter(Boolean).join('\n\n');
@@ -855,9 +1098,10 @@ var tt=0;function toast(m){var t=$('#toast');t.textContent=m;t.hidden=false;clea
 
 /* export */
 function fileName(){
-  var names={free:'svobodnoe-vremya',promo:'akciya',doc:'vrach',tip:'sovet',price:'prais',cover:'oblozhka',avatar:'avatar'};
+  var names={free:'svobodnoe-vremya',promo:'akciya',doc:'vrach',tip:'sovet',price:'prais',cover:'oblozhka',avatar:'avatar',product:'tovar',photo:'foto',myth:'mif'};
+  if(S.tpl==='product')return 'zhemchug-tovar-'+pad2(S.product.i+1)+'.png';
   if(groupTpl(S.tpl))return 'zhemchug-'+names[S.tpl]+'.png';
-  var pg=S.tpl==='price'?'-'+((S.price.page||0)+1):'';
+  var pg=S.tpl==='price'?'-'+((S.price.page||0)+1):S.tpl==='myth'?'-'+((S.myth.page||0)+1):'';
   return 'zhemchug-'+names[S.tpl]+pg+'-'+(S.fmt==='story'?'istoriya':'post')+'-'+today+'.png';
 }
 function makeBlob(){var off=document.createElement('canvas');render(off,S.tpl,S.fmt);return new Promise(function(res,rej){off.toBlob(function(b){b?res(b):rej();},'image/png');});}
