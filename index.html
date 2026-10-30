@@ -663,19 +663,24 @@ var GDRAW={
  product:function(c,w,h){
   grad(c,w,h);var img=bgImage('post_soft_nacre_v1');
   if(img.complete&&img.naturalWidth)fitBottom(c,img,-w*.1,0,w*1.2,h);
-  var p=curProduct()||{},cx=w/2,mw=w-160;
+  var p=curProduct()||{},cx=w/2,mw=w-280;
   logo(c,cx,64,.9,false);
   /* name: two lines if it fits at a readable size, otherwise three */
   var sz,lines,fits=function(n,min){for(sz=104;sz>=min;sz-=4){setFont(c,800,sz);lines=wrap(c,p.name||'',mw);if(lines.length<=n&&!lines.some(function(l){return c.measureText(l).width>mw;}))return true;}return false;};
   if(!fits(2,76))fits(3,60);
+  /* note: up to two lines rather than one squeezed line */
+  var ns=36,nl=[];
+  if(p.note){for(;ns>=28;ns-=2){setFont(c,500,ns);nl=wrap(c,p.note,mw-100);if(nl.length<=2&&!nl.some(function(l){return c.measureText(l).width>mw-100;}))break;}}
+  /* two note lines: split where both halves are closest in width, so no word hangs alone */
+  if(nl.length===2){var ws=p.note.split(/\s+/),best=null;for(var k=1;k<ws.length;k++){var l1=ws.slice(0,k).join(' '),l2=ws.slice(k).join(' '),m=Math.max(c.measureText(l1).width,c.measureText(l2).width);if(!best||m<best.m)best={m:m,l:[l1,l2]};}if(best)nl=best.l;}
   var lh=sz*1.08,cat=(p.cat||'').toUpperCase(),catH=cat?70:0,nameH=lines.length*lh,
-      priceH=p.price?190:0,noteH=p.note?60:0,gap=44,tot=catH+nameH+(priceH?gap+priceH:0)+noteH,y=Math.max(215,575-tot/2);
+      priceH=p.price?190:0,noteH=nl.length?14+nl.length*ns*1.32:0,gap=44,tot=catH+nameH+(priceH?gap+priceH:0)+noteH,y=Math.max(215,575-tot/2);
   if(cat){setFont(c,800,32);ls(c,5);c.fillStyle=COL.steel;c.textAlign='center';c.fillText(cat,cx+2.5,y+30);ls(c,0);y+=catH;}
   setFont(c,800,sz);c.fillStyle=COL.ink;c.textAlign='center';lines.forEach(function(l){c.fillText(l,cx,y+sz*.8);y+=lh;});
-  if(p.price){y+=gap;var ps=120;setFont(c,800,ps);while(c.measureText(p.price).width>mw-140&&ps>60){ps-=6;setFont(c,800,ps);}
+  if(p.price){y+=gap;var ps=120;setFont(c,800,ps);while(c.measureText(p.price).width>mw-120&&ps>60){ps-=6;setFont(c,800,ps);}
     var pw=c.measureText(p.price).width+140;plate(c,cx-pw/2,y,pw,priceH,priceH/2,'rgba(255,255,255,.9)',true,'rgba(255,255,255,.95)');
     c.fillStyle=COL.ink;c.fillText(p.price,cx,y+priceH/2+ps*.36);y+=priceH;}
-  if(p.note){var ns=36;setFont(c,500,ns);while(c.measureText(p.note).width>mw&&ns>24){ns-=2;setFont(c,500,ns);}c.fillStyle=COL.soft;c.fillText(p.note,cx,y+50);}
+  if(nl.length){setFont(c,500,ns);c.fillStyle=COL.soft;y+=14;nl.forEach(function(l){c.fillText(l,cx,y+ns*1.05);y+=ns*1.32;});}
   var ph=(S.clinic.ph1||'').trim();
   if(ph){setFont(c,700,38);var t='Запись: '+ph,tw=c.measureText(t).width,isz=38,x=cx-(tw+isz+16)/2;
     iconPath(c,P_PHONE,x,h-92-isz*.86,isz,COL.steel);c.fillStyle=COL.ink;c.textAlign='left';c.fillText(t,x+isz+16,h-92);}
