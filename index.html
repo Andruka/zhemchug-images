@@ -50,6 +50,13 @@ button{cursor:pointer}
 .tcard:hover canvas{transform:translateY(-3px);box-shadow:0 18px 40px rgba(22,51,91,.18)}
 .tcard b{font-size:16px}
 .tcard span{color:var(--muted);font-size:13.5px;margin-top:-6px}
+.tcard.today canvas{outline:3px solid var(--ink);outline-offset:-3px}
+.tcard.today span{color:var(--ink);font-weight:700}
+.plan{display:flex;flex-direction:column;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 16px;margin-bottom:18px}
+.plan span{color:var(--muted);font-size:13.5px}
+.gtitle{margin:8px 0 14px;font-size:22px;font-weight:800}
+.ggrid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.ggrid .tcard:last-child{max-width:220px}
 
 /* segmented */
 .seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;gap:2px}
@@ -103,7 +110,8 @@ textarea.inp{resize:vertical}
 #viewer img{max-width:100%;max-height:76dvh;border-radius:12px}
 #viewer p{margin:0;color:#E8F1FA;text-align:center;font-weight:600;max-width:40ch}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));background:var(--ink);color:#fff;padding:11px 16px;border-radius:12px;font-weight:600;z-index:60;max-width:90vw;text-align:center}
-@media (max-width:560px){.brand small{display:none}.brand b{font-size:16px}.bar .ghost{padding:8px 11px;font-size:13px}.dock .info{display:none}.dock .save{flex:1}}
+@media (max-width:560px){.brand small{display:none}.brand b{font-size:16px}.bar .ghost{padding:8px 11px;font-size:13px;white-space:nowrap}.bar .wrap{gap:8px}}
+@media (max-width:440px){.brand span{display:none}.dock .info{display:none}.dock .save{flex:1}}
 @media (max-width:860px){
   .editor{grid-template-columns:minmax(0,1fr);gap:18px}
   .stage{position:static}
@@ -146,7 +154,10 @@ html.locked body>*:not(#gate){visibility:hidden}
       <button type="button" data-fmt="story" aria-pressed="true">История</button>
       <button type="button" data-fmt="post" aria-pressed="false">Пост</button>
     </div></div>
+    <div class="plan"><b id="planToday"></b><span id="planWeek"></span></div>
     <div class="grid" id="tgrid"></div>
+    <h2 class="gtitle">Оформление группы</h2>
+    <div class="grid ggrid" id="ggrid"></div>
   </section>
 
   <section id="vEditor" class="wrap" hidden>
@@ -168,6 +179,9 @@ html.locked body>*:not(#gate){visibility:hidden}
           <div class="field"><label for="c-addr2">Уточнение адреса (мелким шрифтом)</label><input class="inp" id="c-addr2" type="text"></div>
           <div class="field"><label for="c-ph1">Телефон 1</label><input class="inp" id="c-ph1" type="text" inputmode="tel"></div>
           <div class="field"><label for="c-ph2">Телефон 2</label><input class="inp" id="c-ph2" type="text" inputmode="tel"></div>
+          <div class="field"><label for="c-ph3">Телефон 3 (только в тексте постов)</label><input class="inp" id="c-ph3" type="text" inputmode="tel"></div>
+          <div class="field"><label for="c-hours">Часы работы (в тексте постов)</label><input class="inp" id="c-hours" type="text"></div>
+          <div class="field"><label for="c-tags">Хэштеги (в конце каждого поста)</label><input class="inp" id="c-tags" type="text"></div>
           <label class="check"><input type="checkbox" id="c-show"> Показывать адрес и телефоны на картинках</label>
         </div>
         <div class="sec">
@@ -253,7 +267,8 @@ var DEFAULT_BG={
  free:{story:'story_tray_right_v2',post:'post_tray_corner_v1'},
  promo:{story:'story_pearl_strand_v2',post:'post_soft_nacre_v1'},
  doc:{story:'story_tray_corner_v1',post:'post_tray_corner_v2'},
- tip:{story:'story_soft_nacre_v1',post:'post_soft_nacre_v3'}
+ tip:{story:'story_soft_nacre_v1',post:'post_soft_nacre_v3'},
+ price:{story:'story_soft_nacre_v1',post:'post_soft_nacre_v1'}
 };
 var KIDS_BG={story:'story_kids_v3',post:'post_kids_v1'};
 
@@ -261,8 +276,43 @@ var TEMPLATES=[
  {id:'free',name:'Свободное время',desc:'Окошки для записи к врачу'},
  {id:'promo',name:'Акция',desc:'Скидка или спецпредложение'},
  {id:'doc',name:'Знакомство с врачом',desc:'Врач, специальность, пункты'},
- {id:'tip',name:'Совет или объявление',desc:'Текст на спокойном фоне'}
+ {id:'tip',name:'Совет или объявление',desc:'Текст на спокойном фоне'},
+ {id:'price',name:'Прайс',desc:'Цены по разделам, несколько страниц'}
 ];
+/* group design: fixed sizes, not story/post */
+var GROUP=[
+ {id:'cover',name:'Обложка группы',desc:'1920×768, для ВКонтакте',w:1920,h:768},
+ {id:'avatar',name:'Аватар группы',desc:'800×800, видна в круге',w:800,h:800}
+];
+function groupTpl(id){for(var i=0;i<GROUP.length;i++)if(GROUP[i].id===id)return GROUP[i];return null;}
+function tplInfo(id){return TEMPLATES.concat(GROUP).filter(function(x){return x.id===id;})[0];}
+
+/* weekly plan: getDay() -> template and hint */
+var PLAN={
+ 1:{tpl:'free',text:'Свободное время на неделю — одним постом'},
+ 3:{tpl:'tip',text:'Совет врача или ответ на частый вопрос'},
+ 5:{tpl:'doc',text:'Знакомство с врачом или акция'}
+};
+var PLAN_WEEK='Пн — свободное время на неделю · Ср — совет врача · Пт — врач или акция · в другие дни — истории со свободным временем';
+
+var PRICE_DEFAULT='# Детская стоматология\n## Лечение зубов\nКариес молочного зуба — 3000 ₽\nЛечение пульпита молочного зуба — 3000–3500 ₽\nЛечение пульпита постоянного зуба — 5000–10 000 ₽\nПрофгигиена — 2500–3000 ₽\n## Удаление\nУдаление молочного зуба — 2500–3000 ₽\n---\n# Лечение зубов\n## Взрослый приём\nКариес — 4000–5000 ₽\nЛечение пульпита — 5000–10 000 ₽\nРеставрация — 6000–8000 ₽\nПрофгигиена — 4000 ₽\nАкция 1+1 — 7000 ₽\n---\n# Удаление и протезирование\n## Удаление · взрослый приём\nПростое — 3000–4000 ₽\nСложное — 5000–7000 ₽\nЗуб мудрости — 7000–10 000 ₽\n## Протезирование\nМеталлокерамика — 15 000 ₽\nБезметалловая керамика — 30 000 ₽\nСъёмный протез — 25 000–30 000 ₽\n---\n# Имплантация и отбеливание\n## Имплантация · акция\nУстановка импланта Osstem (Корея) — 24 990 ₽\n* Цена по акции до 31 декабря 2026. Полная стоимость рассчитывается после КТ-диагностики. Имеются противопоказания, необходима консультация специалиста.\n## Отбеливание · акция\nОтбеливание системой Flash — 25 000 ₽\n* Цена по акции до 31 декабря 2026.';
+/* parse price text into pages: [{title, sections:[{name, rows:[{n,p}], notes:[]}]}] */
+function pricePages(){
+  var pages=[],pg=null,sc=null;
+  function newPage(){pg={title:'',sections:[]};pages.push(pg);sc=null;}
+  function sect(){if(!sc){sc={name:'',rows:[],notes:[]};pg.sections.push(sc);}return sc;}
+  newPage();
+  String(S.price.text||'').split('\n').forEach(function(l){
+    l=l.trim();if(!l)return;
+    if(/^-{3,}$/.test(l)){newPage();return;}
+    if(/^##\s*/.test(l)){sc={name:l.replace(/^##\s*/,''),rows:[],notes:[]};pg.sections.push(sc);return;}
+    if(/^#\s*/.test(l)){if(pg.title||pg.sections.length)newPage();pg.title=l.replace(/^#\s*/,'');return;}
+    if(/^\*/.test(l)){sect().notes.push(l.replace(/^\*\s*/,''));return;}
+    var m=/^(.+?)\s+[—–-]\s+(.+)$/.exec(l);
+    sect().rows.push(m?{n:m[1],p:m[2]}:{n:l,p:''});
+  });
+  return pages.filter(function(p){return p.title||p.sections.length;});
+}
 
 function pad2(n){return (n<10?'0':'')+n;}
 function iso(d){return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
@@ -272,18 +322,24 @@ var today=iso(new Date());
 
 var S={
  fmt:'story', tpl:'free',
- clinic:{addr1:'Бор, ул. Маяковского, 1А',addr2:'офисы 15, 17, 29',ph1:'8-920-001-44-84',ph2:'8-999-390-44-84',show:true,docs:DOCS_DEFAULT},
+ clinic:{addr1:'Бор, ул. Маяковского, 1А',addr2:'офисы 15, 17, 20, 29',ph1:'8-920-001-44-84',ph2:'8-999-390-44-84',ph3:'8-904-789-98-87',hours:'Пн–Пт 8:00–19:00, Сб и Вс — по записи',tags:'#стоматологияжемчуг #стоматологиябор #бор',show:true,docs:DOCS_DEFAULT},
  bgPick:{},
  free:{title:'Свободное время',sub:'',autoSub:true,doctor:'Арутюнян Татьяна Николаевна',spec:'Терапевт',days:[{date:addDays(today,1),times:['10:20','11:00','12:20']},{date:addDays(today,2),times:['9:00','13:40']}]},
  promo:{badge:'Акция',title:'Профессиональная гигиена',value:'−20%',note:'до 30 ноября',text:'Ультразвук, Air Flow и полировка. Запишитесь по телефону.'},
  doc:{doctor:'Тютина Алёна Сергеевна',spec:'Ортодонт',role:'',autoRole:true,lines:'Исправление прикуса\nБрекеты и элайнеры\nКонсультация по записи'},
- tip:{label:'Совет врача',title:'Чистим зубы правильно',text:'Чистите зубы два раза в день по две минуты и не забывайте про зубную нить: она убирает налёт там, куда щётка не достаёт.'}
+ tip:{label:'Совет врача',title:'Чистим зубы правильно',text:'Чистите зубы два раза в день по две минуты и не забывайте про зубную нить: она убирает налёт там, куда щётка не достаёт.'},
+ price:{badge:'Цены с ноября 2026',text:PRICE_DEFAULT,page:0},
+ cover:{tagline:'Семейная стоматология для взрослых и детей',phones:true},
+ avatar:{}
 };
 var KEY='zhemchug-site-v1';
 try{var raw=localStorage.getItem(KEY); if(raw){var sv=JSON.parse(raw);
   ['fmt','tpl'].forEach(function(k){if(sv[k])S[k]=sv[k];});
-  ['clinic','bgPick','free','promo','doc','tip'].forEach(function(k){if(sv[k])Object.assign(S[k],sv[k]);});
+  ['clinic','bgPick','free','promo','doc','tip','price','cover'].forEach(function(k){if(sv[k])Object.assign(S[k],sv[k]);});
 }}catch(e){}
+/* old saved address had a wrong office list */
+if(S.clinic.addr2==='офисы 15, 17, 29')S.clinic.addr2='офисы 15, 17, 20, 29';
+if(!tplInfo(S.tpl))S.tpl='free';
 var saveT=0;
 function persist(){clearTimeout(saveT);saveT=setTimeout(function(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}},300);}
 
@@ -362,18 +418,20 @@ function iconClock(c,x,y,s,col){var cx=x+s/2,cy=y+s/2;c.save();c.strokeStyle=col
 function coverImg(c,img,x,y,w,h){var r=Math.max(w/img.width,h/img.height),dw=img.width*r,dh=img.height*r;c.drawImage(img,x+(w-dw)/2,y+(h-dh)/2,dw,dh);}
 
 /* ================= LAYOUT PARTS ================= */
-function drawHeader(c,y,st){
-  var fs=st?84:72; setFont(c,600,fs); ls(c,fs*.22);
-  var name='ЖЕМЧУГ', tw=c.measureText(name).width-fs*.22, pr=st?46:40, gap=22, total=pr*2+gap+tw, x0=W/2-total/2, base=y+fs*.78;
+/* logo lockup centred on cx; k scales it (1 = post size) */
+function logo(c,cx,y,k,st){
+  var fs=(st?84:72)*k; setFont(c,600,fs); ls(c,fs*.22);
+  var name='ЖЕМЧУГ', tw=c.measureText(name).width-fs*.22, pr=(st?46:40)*k, gap=22*k, total=pr*2+gap+tw, x0=cx-total/2, base=y+fs*.78;
   if(pearlImg.complete&&pearlImg.naturalWidth) c.drawImage(pearlImg,x0,base-fs*.39-pr,pr*2,pr*2);
   c.fillStyle=COL.ink;c.textAlign='left';c.fillText(name,x0+pr*2+gap,base);ls(c,0);
-  var sf=st?24:21, sy=base+(st?50:42);
-  setFont(c,500,sf);ls(c,7);var label='СТОМАТОЛОГИЯ',lw=c.measureText(label).width;
-  c.textAlign='center';c.fillText(label,W/2+3.5,sy);ls(c,0);
-  c.save();c.strokeStyle=COL.ink;c.globalAlpha=.6;c.lineWidth=2;c.beginPath();
-  c.moveTo(W/2-lw/2-70,sy-sf*.32);c.lineTo(W/2-lw/2-24,sy-sf*.32);c.moveTo(W/2+lw/2+24,sy-sf*.32);c.lineTo(W/2+lw/2+70,sy-sf*.32);c.stroke();c.restore();
-  return sy+10;
+  var sf=(st?24:21)*k, sy=base+(st?50:42)*k;
+  setFont(c,500,sf);ls(c,7*k);var label='СТОМАТОЛОГИЯ',lw=c.measureText(label).width;
+  c.textAlign='center';c.fillText(label,cx+3.5*k,sy);ls(c,0);
+  c.save();c.strokeStyle=COL.ink;c.globalAlpha=.6;c.lineWidth=2*k;c.beginPath();
+  c.moveTo(cx-lw/2-70*k,sy-sf*.32);c.lineTo(cx-lw/2-24*k,sy-sf*.32);c.moveTo(cx+lw/2+24*k,sy-sf*.32);c.lineTo(cx+lw/2+70*k,sy-sf*.32);c.stroke();c.restore();
+  return sy+10*k;
 }
+function drawHeader(c,y,st){return logo(c,W/2,y,1,st);}
 function drawFooter(c,H,st){
   var k=S.clinic,bm=st?112:76;
   if(!k.show)return H-bm;
@@ -494,6 +552,81 @@ var TPL={
     plate(c,M,cy,CW,h,44*sc,'rgba(255,255,255,.84)',true,'rgba(255,255,255,.95)');
     c.fillStyle=COL.ink;c.textAlign='left';lines.forEach(function(t,i){c.fillText(t,M+52*sc,cy+pad+fs*.8+i*lh);});cy+=h;}
   return cy;
+ },
+ price:function(c,y,sc,st){
+  var d=S.price,pages=pricePages(),pg=pages[Math.min(d.page||0,pages.length-1)],cy=y;
+  if(!pg)return cy;
+  if(d.badge)cy=badge(c,d.badge,cy,sc)+(st?34:22)*sc;
+  if(pg.title){cy=head(c,pg.title,cy,(st?96:84)*sc,COL.ink,800);cy+=(st?36:28)*sc;}
+  var fs=40*sc,pfs=40*sc,lh=fs*1.22,rp=(st?24:20)*sc,pad=38*sc,priceW=0;
+  setFont(c,800,pfs);pg.sections.forEach(function(s){s.rows.forEach(function(r){priceW=Math.max(priceW,c.measureText(r.p).width);});});
+  var nameW=CW-pad*2-priceW-36*sc;
+  pg.sections.forEach(function(s,si){
+    if(si>0)cy+=(st?30:22)*sc;
+    if(s.name){setFont(c,700,26*sc);ls(c,4*sc);c.fillStyle=COL.soft;c.textAlign='left';c.fillText(s.name.toUpperCase(),M+6*sc,cy+24*sc);ls(c,0);cy+=48*sc;}
+    if(s.rows.length){
+      setFont(c,600,fs);
+      var rows=s.rows.map(function(r){return {lines:wrap(c,r.n,nameW),p:r.p};});
+      var h=pad*2-rp*2;rows.forEach(function(r,i){h+=r.lines.length*lh+rp*2;});
+      plate(c,M,cy,CW,h,36*sc,'rgba(255,255,255,.86)',true,'rgba(255,255,255,.95)');
+      var yy=cy+pad-rp;
+      rows.forEach(function(r,i){
+        if(i>0){c.save();c.fillStyle='rgba(22,51,91,.10)';c.fillRect(M+pad,yy,CW-pad*2,2);c.restore();}
+        yy+=rp;setFont(c,600,fs);c.fillStyle=COL.ink;c.textAlign='left';
+        r.lines.forEach(function(t,j){c.fillText(t,M+pad,yy+fs*.92+j*lh);});
+        if(r.p){setFont(c,800,pfs);c.textAlign='right';c.fillText(r.p,M+CW-pad,yy+pfs*.92);}
+        yy+=r.lines.length*lh+rp;
+      });
+      cy+=h;
+    }
+    if(s.notes.length){var nf=26*sc,nl=nf*1.36;setFont(c,500,nf);c.fillStyle=COL.soft;c.textAlign='left';cy+=14*sc;
+      s.notes.forEach(function(n){wrap(c,'* '+n,CW-12*sc).forEach(function(t){c.fillText(t,M+6*sc,cy+nf*.9);cy+=nl;});});}
+  });
+  return cy;
+ }
+};
+
+/* ================= GROUP DESIGN ================= */
+function grad(c,w,h){var g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,'#F4F9FD');g.addColorStop(1,'#D9EAF8');c.fillStyle=g;c.fillRect(0,0,w,h);}
+/* draw img scaled to width w, bottom-aligned at y+h */
+function fitBottom(c,img,x,y,w,h){var r=w/img.width,dh=img.height*r;c.drawImage(img,x,y+h-dh,w,dh);}
+function pill(c,cx,y,text,ic,k,fill){
+  var fs=34*k,ph=72*k,isz=34*k;setFont(c,700,fs);var tw=c.measureText(text).width,w=tw+(ic?isz+20*k:0)+56*k,x=cx-w/2;
+  plate(c,x,y,w,ph,ph/2,fill||'rgba(255,255,255,.82)',true,'rgba(255,255,255,.95)');
+  var tx=x+28*k;if(ic){iconPath(c,ic,tx,y+ph/2-isz/2,isz,COL.ink,ic===P_PIN);tx+=isz+20*k;}
+  c.fillStyle=COL.ink;c.textAlign='left';c.fillText(text,tx,y+ph/2+fs*.36);return w;
+}
+function pillW(c,text,ic,k){setFont(c,700,34*k);return c.measureText(text).width+(ic?34*k+20*k:0)+56*k;}
+var GDRAW={
+ /* VK shows the cover at 3:1 on desktop with the top cut off, and crops the sides on phones: keep content low and in the middle ~1100px */
+ cover:function(c,w,h){
+  grad(c,w,h);var img=bgImage('post_soft_nacre_v1');
+  if(img.complete&&img.naturalWidth)fitBottom(c,img,0,0,w,h);
+  var tray=bgImage('story_tray_right_v2');
+  if(tray.complete&&tray.naturalWidth){
+    /* tray sits at the right edge of the story background: crop it into the cover's right side */
+    var sw=tray.width*.5,sh=tray.height*.42,sx0=tray.width-sw,sy0=tray.height*.40,dw=h*sw/sh*1.02,dx=w-dw;
+    var off=document.createElement('canvas');off.width=Math.round(dw);off.height=h;var o=off.getContext('2d');
+    o.drawImage(tray,sx0,sy0,sw,sh,0,0,dw,h);
+    o.globalCompositeOperation='destination-in';var fg=o.createLinearGradient(0,0,dw,0);fg.addColorStop(0,'rgba(0,0,0,0)');fg.addColorStop(.45,'rgba(0,0,0,1)');o.fillStyle=fg;o.fillRect(0,0,dw,h);
+    c.drawImage(off,dx,0);
+  }
+  var cx=w/2,k=1.4,d=S.cover,y=logo(c,cx,172,k,false);
+  if(d.tagline){var fs=46;setFont(c,600,fs);c.fillStyle=COL.soft;c.textAlign='center';c.fillText(d.tagline,cx,y+70);y+=70;}
+  if(d.phones){
+    var k2=1.0,k3=S.clinic,a=[(k3.addr1||'').trim(),P_PIN],ps=[k3.ph1,k3.ph2].map(function(s){return (s||'').trim();}).filter(Boolean).map(function(p){return [p,P_PHONE];});
+    var row1=a[0]?[a]:[],row2=ps,yy=y+56;
+    [row1,row2].forEach(function(row){if(!row.length)return;var gap=20,tot=-gap;row.forEach(function(it){tot+=pillW(c,it[0],it[1],k2)+gap;});
+      var x=cx-tot/2;row.forEach(function(it){var pw=pillW(c,it[0],it[1],k2);pill(c,x+pw/2,yy,it[0],it[1],k2);x+=pw+gap;});yy+=72*k2+18;});
+  }
+ },
+ avatar:function(c,w,h){
+  grad(c,w,h);var img=bgImage('post_soft_nacre_v1');
+  if(img.complete&&img.naturalWidth)fitBottom(c,img,-w*.1,0,w*1.2,h);
+  var r=w*.24,cx=w/2,cy=h*.40;
+  var rg=c.createRadialGradient(cx,cy,r*.6,cx,cy,r*1.9);rg.addColorStop(0,'rgba(169,203,234,.75)');rg.addColorStop(1,'rgba(169,203,234,0)');c.fillStyle=rg;c.fillRect(0,0,w,h);
+  if(pearlImg.complete&&pearlImg.naturalWidth){c.save();c.shadowColor='rgba(40,80,130,.22)';c.shadowBlur=40;c.shadowOffsetY=16;c.drawImage(pearlImg,cx-r,cy-r,r*2,r*2);c.restore();}
+  var fs=w*.118;setFont(c,700,fs);ls(c,fs*.16);c.fillStyle=COL.ink;c.textAlign='center';c.fillText('ЖЕМЧУГ',cx+fs*.08,h*.76);ls(c,0);
  }
 };
 
@@ -501,6 +634,8 @@ var TPL={
 var SCALES=[1,.93,.86,.79,.72,.66,.6,.55,.5];
 var scratch=document.createElement('canvas');scratch.width=W;scratch.height=3600;var sx=scratch.getContext('2d');
 function render(canvas,tpl,fmt){
+  var gt=groupTpl(tpl);
+  if(gt){canvas.width=gt.w;canvas.height=gt.h;var gc=canvas.getContext('2d');gc.textBaseline='alphabetic';GDRAW[tpl](gc,gt.w,gt.h);return;}
   var H=FORMATS[fmt].h,st=fmt==='story',id=bgFor(tpl,fmt),meta=bgMeta(id),img=bgImage(id);
   canvas.width=W;canvas.height=H;var c=canvas.getContext('2d');c.textBaseline='alphabetic';
   var g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#F4F9FD');g.addColorStop(1,'#D9EAF8');c.fillStyle=g;c.fillRect(0,0,W,H);
@@ -518,7 +653,7 @@ function $(s){return document.querySelector(s);}
 function el(tag,attrs,kids){var e=document.createElement(tag);if(attrs)for(var k in attrs){if(k==='text')e.textContent=attrs[k];else if(k==='on')for(var ev in attrs.on)e.addEventListener(ev,attrs.on[ev]);else e.setAttribute(k,attrs[k]);}
   (kids||[]).forEach(function(x){if(x)e.appendChild(x);});return e;}
 var cv=$('#cv'),raf=0;
-function redraw(){persist();cancelAnimationFrame(raf);raf=requestAnimationFrame(function(){render(cv,S.tpl,S.fmt);});}
+function redraw(){persist();updCaption();cancelAnimationFrame(raf);raf=requestAnimationFrame(function(){render(cv,S.tpl,S.fmt);});}
 
 var view='gallery';
 function show(v){
@@ -526,20 +661,31 @@ function show(v){
   $('#dock').hidden=v!=='editor';$('#btnBack').hidden=v==='gallery';$('#btnClinic').hidden=v==='clinic';
   window.scrollTo(0,0);
   if(v==='gallery')drawGallery();
-  if(v==='editor'){buildForm();redraw();}
+  if(v==='editor'){buildForm();redraw();if(groupTpl(S.tpl)){bgImage('post_soft_nacre_v1',redraw);bgImage('story_tray_right_v2',redraw);}}
   if(v==='clinic')fillClinic();
 }
 
 /* gallery */
 function drawGallery(){
   document.querySelectorAll('#gFmt button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.fmt===S.fmt));});
+  var plan=PLAN[new Date().getDay()];
+  $('#planToday').textContent=plan?'Сегодня по плану: '+plan.text+'.':'Сегодня по плану: история со свободным временем.';
+  $('#planWeek').textContent=PLAN_WEEK;
   var grid=$('#tgrid');grid.innerHTML='';
   TEMPLATES.forEach(function(t){
     var cvs=el('canvas',{width:W,height:FORMATS[S.fmt].h,'aria-hidden':'true'});
-    var card=el('button',{type:'button','class':'tcard',on:{click:function(){S.tpl=t.id;show('editor');}}},[cvs,el('b',{text:t.name}),el('span',{text:t.desc})]);
+    var today=plan&&plan.tpl===t.id;
+    var card=el('button',{type:'button','class':'tcard'+(today?' today':''),on:{click:function(){S.tpl=t.id;show('editor');}}},[cvs,el('b',{text:t.name}),el('span',{text:today?'По плану сегодня':t.desc})]);
     grid.appendChild(card);
     var paint=function(){render(cvs,t.id,S.fmt);};
     paint();bgImage(bgFor(t.id,S.fmt),paint);
+  });
+  var gg=$('#ggrid');gg.innerHTML='';
+  GROUP.forEach(function(t){
+    var cvs=el('canvas',{width:t.w,height:t.h,'aria-hidden':'true'});
+    gg.appendChild(el('button',{type:'button','class':'tcard',on:{click:function(){S.tpl=t.id;show('editor');}}},[cvs,el('b',{text:t.name}),el('span',{text:t.desc})]));
+    var paint=function(){render(cvs,t.id,S.fmt);};
+    paint();bgImage('post_soft_nacre_v1',paint);bgImage('story_tray_right_v2',paint);
   });
 }
 document.querySelectorAll('#gFmt button').forEach(function(b){b.addEventListener('click',function(){S.fmt=b.dataset.fmt;persist();drawGallery();});});
@@ -598,10 +744,28 @@ function daysSection(){
   return box;
 }
 function buildForm(){
-  var f=$('#form');f.innerHTML='';var t=TEMPLATES.filter(function(x){return x.id===S.tpl;})[0];
+  var f=$('#form');f.innerHTML='';var t=tplInfo(S.tpl);
   f.appendChild(el('h2',{text:t.name}));
-  f.appendChild(fmtSection());
-  if(S.tpl==='free'){
+  if(!groupTpl(S.tpl))f.appendChild(fmtSection());
+  if(S.tpl==='cover'){
+    var cv2=S.cover,ph=el('label',{'class':'check'},[el('input',{type:'checkbox',id:'f-cover-phones'})]);
+    ph.appendChild(document.createTextNode(' Показывать адрес и телефоны'));
+    var chk=ph.querySelector('input');chk.checked=!!cv2.phones;chk.addEventListener('change',function(){cv2.phones=chk.checked;redraw();});
+    f.appendChild(sec('Текст',[textField('Строка под логотипом',cv2,'tagline'),ph]));
+    f.appendChild(sec('Как поставить',[el('p',{style:'margin:0',text:'Управление → Настройки → Обложка сообщества → Загрузить. Края на телефоне обрезаются, поэтому всё важное стоит в середине.'})]));
+  }else if(S.tpl==='avatar'){
+    f.appendChild(sec('Как поставить',[el('p',{style:'margin:0',text:'На странице группы нажмите на аватар → «Загрузить фотографию». Выделите весь квадрат, затем круг для миниатюры по центру.'})]));
+  }else if(S.tpl==='price'){
+    var pr=S.price;if((pr.page||0)>=pricePages().length)pr.page=0;
+    var pchips=el('div',{'class':'chips',role:'group','aria-label':'Страница'});
+    var fillChips=function(){pchips.innerHTML='';pricePages().forEach(function(p,i){pchips.appendChild(el('button',{type:'button','class':'chip','aria-pressed':String((pr.page||0)===i),text:(i+1)+'. '+(p.title||'Без заголовка'),on:{click:function(){pr.page=i;buildForm();redraw();}}}));});};
+    fillChips();
+    f.appendChild(sec('Страница',[pchips,el('span',{style:'color:var(--muted);font-size:13px',text:'Сохраните каждую страницу и выложите их одним постом: получится листаемая карусель.'})]));
+    f.appendChild(sec('Цены',[textField('Метка сверху',pr,'badge'),
+      textField('Прайс',pr,'text',{area:true,rows:16,onInput:function(){var n=pricePages().length;if((pr.page||0)>=n)pr.page=0;fillChips();}}),
+      el('span',{style:'color:var(--muted);font-size:13px',text:'«# Заголовок» — новая страница с заголовком, «## Раздел» — раздел, «Услуга — цена» — строка, «* текст» — сноска мелким шрифтом, «---» — разрыв страницы.'}),
+      el('button',{type:'button','class':'small',style:'align-self:flex-start',text:'Вернуть исходный прайс',on:{click:function(){pr.text=PRICE_DEFAULT;pr.page=0;buildForm();redraw();}}})]));
+  }else if(S.tpl==='free'){
     var d=S.free;
     f.appendChild(sec('Врач',[doctorPicker(d)]));
     f.appendChild(sec('Даты и время',[daysSection()]));
@@ -618,16 +782,67 @@ function buildForm(){
   }else{
     var q=S.tip;f.appendChild(sec('Текст',[textField('Метка',q,'label'),textField('Заголовок',q,'title'),textField('Текст',q,'text',{area:true,rows:5})]));
   }
-  updDock();
+  if(!groupTpl(S.tpl)){
+    var cap=el('textarea',{'class':'inp',id:'caption',rows:9,'aria-label':'Текст публикации'});
+    var copy=el('button',{type:'button','class':'small',style:'align-self:flex-start',text:'Скопировать текст',on:{click:function(){copyText(cap.value);}}});
+    f.appendChild(sec('Текст к публикации',[cap,copy,el('span',{style:'color:var(--muted);font-size:13px',text:'Вставьте его в пост под картинкой: так пост лучше находят в поиске и ленте. Текст можно поправить перед копированием.'})]));
+  }
+  updDock();updCaption();
 }
-function updDock(){$('#dockInfo').textContent=S.fmt==='story'?'История · 1080×1920':'Пост · 1080×1350';}
+function updDock(){var g=groupTpl(S.tpl);$('#dockInfo').textContent=g?g.name+' · '+g.w+'×'+g.h:(S.fmt==='story'?'История · 1080×1920':'Пост · 1080×1350');}
+
+/* post caption: generated from the same data as the picture */
+var WD=['вс','пн','вт','ср','чт','пт','сб'];
+function wday(s){var p=String(s||'').split('-');if(p.length!==3)return '';return WD[new Date(+p[0],+p[1]-1,+p[2]).getDay()];}
+function contacts(){
+  var k=S.clinic,o=[],ph=[k.ph1,k.ph2,k.ph3].map(function(s){return (s||'').trim();}).filter(Boolean);
+  if(ph.length)o.push('Запись по телефону:\n'+ph.map(function(p){return '📞 '+p;}).join('\n'));
+  var a=[k.addr1,k.addr2].map(function(s){return (s||'').trim();}).filter(Boolean).join(', ');if(a)o.push('📍 '+a);
+  if((k.hours||'').trim())o.push('🕘 '+k.hours.trim());
+  return o.join('\n');
+}
+function caption(){
+  var parts=[],t=S.tpl;
+  if(t==='free'){var d=S.free,role=SPEC_ROLE[d.spec]||d.spec||'';
+    parts.push(([d.title,freeSub()].filter(Boolean).join(' '))+' 🦷'+(d.doctor?'\nПриём ведёт '+(role?role.toLowerCase()+' ':'')+d.doctor+'.':''));
+    var rows=(d.days||[]).filter(function(r){return r.date&&r.times.length;}).map(function(r){return '🗓 '+ddmm(r.date)+' ('+wday(r.date)+'): '+r.times.join(', ');});
+    if(rows.length)parts.push(rows.join('\n'));
+    parts.push('Время может закончиться — запишитесь заранее.');
+  }else if(t==='promo'){var p=S.promo;
+    parts.push((p.badge?p.badge+': ':'')+p.title+(p.value?' — '+p.value:'')+(p.note?' ('+p.note+')':''));
+    if(p.text)parts.push(p.text);
+  }else if(t==='doc'){var o=S.doc,r2=o.autoRole?(SPEC_ROLE[o.spec]||o.spec||''):o.role;
+    parts.push('Знакомьтесь: '+o.doctor+(r2?', '+r2.toLowerCase():'')+'.');
+    var it=String(o.lines||'').split('\n').map(function(s){return s.trim();}).filter(Boolean);
+    if(it.length)parts.push(it.map(function(s){return '• '+s;}).join('\n'));
+  }else if(t==='tip'){var q=S.tip;
+    parts.push((q.label?q.label+': ':'')+q.title);if(q.text)parts.push(q.text);
+    parts.push('Остались вопросы? Запишитесь на консультацию — врач всё расскажет и покажет.');
+  }else if(t==='price'){
+    parts.push('Цены в стоматологии «Жемчуг»'+(S.price.badge?' · '+S.price.badge.toLowerCase().replace(/^цены\s*/,''):'')+'. Листайте карточки 👉');
+    pricePages().forEach(function(pg){var l=[];if(pg.title)l.push('🦷 '+pg.title.toUpperCase());
+      pg.sections.forEach(function(s){if(s.name)l.push(s.name+':');s.rows.forEach(function(r){l.push('▫️ '+r.n+(r.p?' — '+r.p:''));});s.notes.forEach(function(n){l.push('* '+n);});});
+      parts.push(l.join('\n'));});
+    parts.push('Точную стоимость лечения врач назовёт после осмотра.');
+  }
+  parts.push(contacts());
+  if((S.clinic.tags||'').trim())parts.push(S.clinic.tags.trim());
+  return parts.filter(Boolean).join('\n\n');
+}
+function updCaption(){var ta=document.getElementById('caption');if(ta)ta.value=caption();}
+function copyText(s){
+  var ok=function(){toast('Текст скопирован. Вставьте его в пост.');};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s).then(ok,fallback);}else fallback();
+  function fallback(){var ta=document.getElementById('caption');ta.focus();ta.select();try{document.execCommand('copy');ok();}catch(e){toast('Выделите текст и скопируйте вручную.');}}
+}
 
 /* clinic */
+var CLINIC_FIELDS=[['c-addr1','addr1'],['c-addr2','addr2'],['c-ph1','ph1'],['c-ph2','ph2'],['c-ph3','ph3'],['c-hours','hours'],['c-tags','tags'],['c-docs','docs']];
 function fillClinic(){
-  var k=S.clinic;[['c-addr1','addr1'],['c-addr2','addr2'],['c-ph1','ph1'],['c-ph2','ph2'],['c-docs','docs']].forEach(function(p){$('#'+p[0]).value=k[p[1]]||'';});
+  var k=S.clinic;CLINIC_FIELDS.forEach(function(p){$('#'+p[0]).value=k[p[1]]||'';});
   $('#c-show').checked=!!k.show;
 }
-[['c-addr1','addr1'],['c-addr2','addr2'],['c-ph1','ph1'],['c-ph2','ph2'],['c-docs','docs']].forEach(function(p){$('#'+p[0]).addEventListener('input',function(e){S.clinic[p[1]]=e.target.value;persist();});});
+CLINIC_FIELDS.forEach(function(p){$('#'+p[0]).addEventListener('input',function(e){S.clinic[p[1]]=e.target.value;persist();});});
 $('#c-show').addEventListener('change',function(e){S.clinic.show=e.target.checked;persist();});
 $('#c-reset').addEventListener('click',function(){S.clinic.docs=DOCS_DEFAULT;$('#c-docs').value=DOCS_DEFAULT;persist();toast('Список врачей восстановлен.');});
 
@@ -639,7 +854,12 @@ $('#btnClinic').addEventListener('click',function(){show('clinic');});
 var tt=0;function toast(m){var t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(function(){t.hidden=true;},3000);}
 
 /* export */
-function fileName(){var names={free:'svobodnoe-vremya',promo:'akciya',doc:'vrach',tip:'sovet'};return 'zhemchug-'+names[S.tpl]+'-'+(S.fmt==='story'?'istoriya':'post')+'-'+today+'.png';}
+function fileName(){
+  var names={free:'svobodnoe-vremya',promo:'akciya',doc:'vrach',tip:'sovet',price:'prais',cover:'oblozhka',avatar:'avatar'};
+  if(groupTpl(S.tpl))return 'zhemchug-'+names[S.tpl]+'.png';
+  var pg=S.tpl==='price'?'-'+((S.price.page||0)+1):'';
+  return 'zhemchug-'+names[S.tpl]+pg+'-'+(S.fmt==='story'?'istoriya':'post')+'-'+today+'.png';
+}
 function makeBlob(){var off=document.createElement('canvas');render(off,S.tpl,S.fmt);return new Promise(function(res,rej){off.toBlob(function(b){b?res(b):rej();},'image/png');});}
 var DL=null;
 if(window.claude&&window.claude.use){window.claude.use('downloads').then(function(d){DL=d;}).catch(function(){});}
