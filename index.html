@@ -763,7 +763,7 @@ var TPL={
   var d=S.price,pages=pricePages(),pg=pages[Math.min(d.page||0,pages.length-1)],cy=y;
   if(!pg)return cy;
   if(d.badge)cy=badge(c,d.badge,cy,sc)+(st?34:22)*sc;
-  if(pg.title){cy=head(c,pg.title,cy,(st?96:84)*sc,COL.ink,800);cy+=(st?36:28)*sc;}
+  if(pg.title){var hs=(st?96:84);pages.forEach(function(p){if(p.title)hs=Math.min(hs,fitSize(c,p.title,st?96:84,800,CW));});cy=head(c,pg.title,cy,hs,COL.ink,800);cy+=(st?36:28)*sc;}
   var fs=40*sc,pfs=40*sc,lh=fs*1.22,rp=(st?24:20)*sc,pad=38*sc,priceW=0;
   setFont(c,800,pfs);pg.sections.forEach(function(s){s.rows.forEach(function(r){priceW=Math.max(priceW,c.measureText(r.p).width);});});
   var nameW=CW-pad*2-priceW-36*sc;
@@ -804,11 +804,15 @@ function pill(c,cx,y,text,ic,k,fill){
 }
 function pillW(c,text,ic,k){setFont(c,700,34*k);return c.measureText(text).width+(ic?34*k+20*k:0)+56*k;}
 /* one sheet of A4 at 300 dpi with every page of «Прайс»; sizes are in post pixels times u */
+/* one heading size for every block: the largest at which all page titles fit the column */
+var SHEET_TITLES=[];
+function sheetTitle(c,cw,u){var ts=50*u;setFont(c,800,ts);
+  SHEET_TITLES.forEach(function(t){while(c.measureText(t).width>cw&&ts>12){ts-=1;setFont(c,800,ts);}});return ts;}
 function sheetBlock(c,pg,x,y,cw,u,draw,flat){
   /* flat: one plate per page without section labels, to save height */
   if(flat)pg={title:pg.title,sections:[pg.sections.reduce(function(a,s){return {name:'',rows:a.rows.concat(s.rows),notes:a.notes.concat(s.notes)};},{name:'',rows:[],notes:[]})]};
   var over=false,y0=y,fs=31*u,lh=fs*1.2,rp=(flat?11:14)*u,pad=(flat?22:30)*u,priceW=0;
-  if(pg.title){var ts=50*u;setFont(c,800,ts);while(c.measureText(pg.title).width>cw&&ts>12){ts-=1;setFont(c,800,ts);}if(draw){c.fillStyle=COL.ink;c.textAlign='left';c.fillText(pg.title,x,y+ts*.8);}y+=ts*1.0+16*u;}
+  if(pg.title){var ts=sheetTitle(c,cw,u);setFont(c,800,ts);if(draw){c.fillStyle=COL.ink;c.textAlign='left';c.fillText(pg.title,x,y+ts*.8);}y+=ts*1.0+16*u;}
   setFont(c,800,fs);pg.sections.forEach(function(s){s.rows.forEach(function(r){priceW=Math.max(priceW,c.measureText(r.p).width);});});
   var nameW=cw-pad*2-priceW-(flat?26:28)*u;
   pg.sections.forEach(function(s,si){
@@ -839,6 +843,7 @@ function sheetBlock(c,pg,x,y,cw,u,draw,flat){
 var SHEET_PRINT=false;
 function sheetPlate(c,x,y,w,h,r,fill){if(SHEET_PRINT)plate(c,x,y,w,h,r,fill==='soft'?'#EEF5FC':'#FFFFFF',false,'rgba(22,51,91,.22)');else plate(c,x,y,w,h,r,fill==='soft'?'rgba(255,255,255,.9)':'rgba(255,255,255,.86)',true,'rgba(255,255,255,.95)');}
 function drawSheet(c,w,h,post){
+  SHEET_TITLES=pricePages().map(function(pg){return pg.title;}).filter(Boolean);
   SHEET_PRINT=!post&&!!S.pricelist.print;
   if(SHEET_PRINT){c.fillStyle='#FFFFFF';c.fillRect(0,0,w,h);}
   else{grad(c,w,h);var img=bgImage('story_soft_nacre_v1');if(img.complete&&img.naturalWidth)coverImg(c,img,0,0,w,h);}
