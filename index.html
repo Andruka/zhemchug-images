@@ -299,7 +299,8 @@ var TEMPLATES=[
 var GROUP=[
  {id:'cover',name:'Обложка группы',desc:'1920×768, для ВКонтакте',w:1920,h:768},
  {id:'avatar',name:'Аватар группы',desc:'800×800, видна в круге',w:800,h:800},
- {id:'product',name:'Карточка товара',desc:'1080×1080, для раздела «Товары»',w:1080,h:1080}
+ {id:'product',name:'Карточка товара',desc:'1080×1080, для раздела «Товары»',w:1080,h:1080},
+ {id:'pricelist',name:'Прайс на листе А4',desc:'Все услуги на одной странице, для печати',w:2480,h:3508}
 ];
 function groupTpl(id){for(var i=0;i<GROUP.length;i++)if(GROUP[i].id===id)return GROUP[i];return null;}
 function tplInfo(id){return TEMPLATES.concat(GROUP).filter(function(x){return x.id===id;})[0];}
@@ -317,7 +318,7 @@ function planWeek(d){return isoWeek(d)%2?0:1;}
 function planToday(){var d=new Date();return PLAN[planWeek(d)][d.getDay()];}
 
 /* medical services ads need this warning (ФЗ «О рекламе», ст. 24 ч. 7) on at least 5% of the image area */
-var WARN_TPL={promo:1,price:1,product:1};
+var WARN_TPL={promo:1,price:1,product:1,pricelist:1};
 var WARN_TEXT='Имеются противопоказания. Необходима консультация специалиста.';
 var WARN_SHARE=.06;
 
@@ -338,15 +339,18 @@ function mythPages(){
 }
 
 
-var PRICE_DEFAULT='# Детская стоматология\n## Лечение зубов\nКариес молочного зуба — 3000 ₽\nЛечение пульпита молочного зуба — 3000–3500 ₽\nЛечение пульпита постоянного зуба — 5000–10 000 ₽\nПрофгигиена — 2500–3000 ₽\n## Удаление\nУдаление молочного зуба — 2500–3000 ₽\n# Лечение зубов\n## Взрослый приём\nКариес — 4000–5000 ₽\nЛечение пульпита — 5000–10 000 ₽\nРеставрация — 6000–8000 ₽\nПрофгигиена — 4000 ₽\nАкция 1+1 — 7000 ₽\n# Удаление зубов\n## Взрослый приём\nПростое удаление — 3000–4000 ₽\nСложное удаление — 5000–7000 ₽\nУдаление зуба мудрости — 7000–10 000 ₽\n# Протезирование\n## Коронки и протезы\nМеталлокерамика — 15 000 ₽\nБезметалловая керамика — 30 000 ₽\nСъёмный протез — 25 000–30 000 ₽\n# Имплантация\n## Акция\nУстановка импланта Osstem (Корея) — 24 990 ₽\n* Цена по акции до 31 декабря 2026. Полная стоимость рассчитывается после КТ-диагностики. Имеются противопоказания, необходима консультация специалиста.\n# Отбеливание\n## Акция\nОтбеливание системой Flash — 25 000 ₽\n* Цена по акции до 31 декабря 2026.';
+var PRICE_DEFAULT='# Детская стоматология\n## Лечение зубов\nКариес молочного зуба — 3000 ₽\nЛечение пульпита молочного зуба — 3000–3500 ₽\nЛечение пульпита постоянного зуба — 5000–10 000 ₽\nПрофгигиена — 2500–3000 ₽\n## Удаление\nУдаление молочного зуба — 2500–3000 ₽\n# Лечение зубов\n## Взрослый приём\nКариес — 4000–5000 ₽\nЛечение пульпита — 5000–10 000 ₽\nРеставрация — 6000–8000 ₽\nЛечение начального кариеса без сверления (ICON), 1 зуб — 3000 ₽\nПрофгигиена — 4000 ₽\nПрофгигиена по акции 1+1 — 7000 ₽\n# Удаление зубов\n## Взрослый приём\nПростое удаление — 3000–4000 ₽\nСложное удаление — 5000–7000 ₽\nУдаление зуба мудрости — 7000–10 000 ₽\n# Протезирование\n## Коронки и протезы\nМеталлокерамика — 15 000 ₽\nБезметалловая керамика — 30 000 ₽\nСъёмный протез — 25 000–30 000 ₽\n# Имплантация\n## Акция\nУстановка импланта Osstem (Корея) — 24 990 ₽\n* Цена по акции до 31 декабря 2026. Полная стоимость рассчитывается после КТ-диагностики. Имеются противопоказания, необходима консультация специалиста.\n# Отбеливание\n## Акция\nОтбеливание системой Flash — 25 000 ₽\n* Цена по акции до 31 декабря 2026.';
+/* defaults before ICON and the 1+1 wording: saved copies equal to them are upgraded on load */
+var PRICE_V1=PRICE_DEFAULT.replace('Лечение начального кариеса без сверления (ICON), 1 зуб — 3000 ₽\n','').replace('Профгигиена по акции 1+1','Акция 1+1');
 /* parse price text into pages: [{title, sections:[{name, rows:[{n,p}], notes:[]}]}] */
 /* services for the VK «Товары» section: price is what the card shows, vk is the number for VK's price field */
 var PRODUCTS_DEFAULT=[
  {cat:'Лечение зубов',name:'Лечение кариеса',price:'от 4000 ₽',note:'4000–5000 ₽ в зависимости от сложности',text:'Лечим кариес под местной анестезией и ставим светоотверждаемую пломбу. Точную стоимость врач назовёт после осмотра.'},
+ {cat:'Лечение зубов',name:'Лечение кариеса без сверления ICON',price:'3000 ₽',note:'За один зуб',text:'Лечение начального кариеса методом инфильтрации ICON: без бормашины и без анестезии. Подходит, пока кариес в стадии белого пятна — это врач определит на осмотре.'},
  {cat:'Лечение зубов',name:'Лечение пульпита',price:'от 5000 ₽',note:'5000–10 000 ₽, зависит от числа каналов',text:'Лечение воспалённого нерва зуба: обработка и пломбирование каналов, восстановление зуба пломбой.'},
  {cat:'Эстетика',name:'Художественная реставрация',price:'от 6000 ₽',note:'6000–8000 ₽',text:'Восстанавливаем форму и цвет зуба композитом: сколы, промежутки между зубами, разрушенные края.'},
  {cat:'Гигиена',name:'Профессиональная гигиена',price:'4000 ₽',note:'Для взрослых',text:'Снятие зубного камня ультразвуком, чистка Air Flow, полировка и фторирование. Рекомендуем раз в полгода.'},
- {cat:'Акция',name:'Акция 1+1',price:'7000 ₽',note:'Подробности уточняйте по телефону',text:'Подробности акции уточняйте у администратора по телефону.'},
+ {cat:'Гигиена · акция',name:'Профгигиена по акции 1+1',price:'7000 ₽',note:'Условия акции уточняйте по телефону',text:'Акция 1+1 на профессиональную гигиену: снятие камня ультразвуком, Air Flow, полировка и фторирование. Условия акции уточняйте у администратора.'},
  {cat:'Детская стоматология',name:'Лечение кариеса молочного зуба',price:'3000 ₽',note:'Детский приём',text:'Бережно лечим молочные зубы. Детский врач найдёт подход даже к самым маленьким пациентам.'},
  {cat:'Детская стоматология',name:'Лечение пульпита у детей',price:'от 3000 ₽',note:'Молочный зуб 3000–3500 ₽, постоянный 5000–10 000 ₽',text:'Лечение воспалённого нерва молочного или постоянного зуба у ребёнка.'},
  {cat:'Детская стоматология',name:'Детская профгигиена',price:'от 2500 ₽',note:'2500–3000 ₽',text:'Чистка зубов ребёнку и урок правильной чистки дома.'},
@@ -359,6 +363,7 @@ var PRODUCTS_DEFAULT=[
  {cat:'Имплантация · акция',name:'Имплант Osstem (Корея)',price:'24 990 ₽',note:'Цена по акции до 31 декабря 2026',text:'Установка импланта Osstem (Корея). Полная стоимость рассчитывается после КТ-диагностики. Имеются противопоказания, необходима консультация специалиста.'},
  {cat:'Отбеливание · акция',name:'Отбеливание Flash',price:'25 000 ₽',note:'Цена по акции до 31 декабря 2026',text:'Кабинетное отбеливание системой Flash. Перед процедурой нужна консультация и профессиональная гигиена.'}
 ];
+function productsV1(){var o=cloneProducts().filter(function(p){return p.name!=='Лечение кариеса без сверления ICON';});o.forEach(function(p){if(p.name==='Профгигиена по акции 1+1')Object.assign(p,{cat:'Акция',name:'Акция 1+1',note:'Подробности уточняйте по телефону',text:'Подробности акции уточняйте у администратора по телефону.'});});return o;}
 function cloneProducts(){return PRODUCTS_DEFAULT.map(function(p){return Object.assign({},p);});}
 /* VK's price field takes one number: the first one on the card */
 function vkPrice(p){var m=/\d[\d\s]*/.exec(p.price||'');return m?m[0].replace(/\s/g,''):'';}
@@ -409,6 +414,9 @@ try{var raw=localStorage.getItem(KEY); if(raw){var sv=JSON.parse(raw);
 }}catch(e){}
 /* old saved address had a wrong office list */
 if(S.clinic.addr2==='офисы 15, 17, 29')S.clinic.addr2='офисы 15, 17, 20, 29';
+/* untouched old defaults follow the new ones */
+if(S.price.text===PRICE_V1)S.price.text=PRICE_DEFAULT;
+if(S.product.items&&JSON.stringify(S.product.items)===JSON.stringify(productsV1()))S.product.items=cloneProducts();
 if(!tplInfo(S.tpl))S.tpl='free';
 if(!S.product.items||!S.product.items.length)S.product.items=cloneProducts();
 function curProduct(){var p=S.product;if(!(p.i<p.items.length))p.i=0;return p.items[p.i];}
@@ -549,7 +557,7 @@ function darkBg(c,w,h,img){
 function warnBand(c,w,y,bh){
   c.fillStyle='rgba(255,255,255,.78)';c.fillRect(0,y,w,bh);
   c.fillStyle='rgba(22,51,91,.14)';c.fillRect(0,y,w,2);
-  var mw=w-96,fs=Math.floor(bh*.34),lines=[WARN_TEXT];
+  var mw=w-Math.max(96,w*.14),fs=Math.floor(bh*.34),lines=[WARN_TEXT];
   setFont(c,600,fs);
   if(c.measureText(WARN_TEXT).width>mw){
     var one=fs;while(c.measureText(WARN_TEXT).width>mw&&one>20){one--;setFont(c,600,one);}
@@ -744,6 +752,33 @@ function pill(c,cx,y,text,ic,k,fill){
   c.fillStyle=COL.ink;c.textAlign='left';c.fillText(text,tx,y+ph/2+fs*.36);return w;
 }
 function pillW(c,text,ic,k){setFont(c,700,34*k);return c.measureText(text).width+(ic?34*k+20*k:0)+56*k;}
+/* one sheet of A4 at 300 dpi with every page of «Прайс»; sizes are in post pixels times u */
+function sheetBlock(c,pg,x,y,cw,u,draw){
+  var y0=y,fs=31*u,lh=fs*1.2,rp=14*u,pad=30*u,priceW=0;
+  if(pg.title){var ts=50*u;if(draw){setFont(c,800,ts);c.fillStyle=COL.ink;c.textAlign='left';c.fillText(pg.title,x,y+ts*.8);}y+=ts*1.0+16*u;}
+  setFont(c,800,fs);pg.sections.forEach(function(s){s.rows.forEach(function(r){priceW=Math.max(priceW,c.measureText(r.p).width);});});
+  var nameW=cw-pad*2-priceW-28*u;
+  pg.sections.forEach(function(s,si){
+    if(si>0)y+=16*u;
+    if(s.name){if(draw){setFont(c,700,21*u);ls(c,3.5*u);c.fillStyle=COL.soft;c.textAlign='left';c.fillText(s.name.toUpperCase(),x+5*u,y+20*u);ls(c,0);}y+=36*u;}
+    if(s.rows.length){
+      setFont(c,600,fs);var rows=s.rows.map(function(r){return {lines:wrap(c,r.n,nameW),p:r.p};}),h=pad*2-rp*2;
+      rows.forEach(function(r){h+=r.lines.length*lh+rp*2;});
+      if(draw){plate(c,x,y,cw,h,28*u,'rgba(255,255,255,.86)',true,'rgba(255,255,255,.95)');
+        var yy=y+pad-rp;
+        rows.forEach(function(r,i){
+          if(i>0){c.fillStyle='rgba(22,51,91,.10)';c.fillRect(x+pad,yy,cw-pad*2,2*u);}
+          yy+=rp;setFont(c,600,fs);c.fillStyle=COL.ink;c.textAlign='left';
+          r.lines.forEach(function(t,j){c.fillText(t,x+pad,yy+fs*.92+j*lh);});
+          if(r.p){setFont(c,800,fs);c.textAlign='right';c.fillText(r.p,x+cw-pad,yy+fs*.92);}
+          yy+=r.lines.length*lh+rp;});}
+      y+=h;
+    }
+    if(s.notes.length){var nf=21*u,nl=nf*1.34;setFont(c,500,nf);c.fillStyle=COL.soft;c.textAlign='left';y+=10*u;
+      s.notes.forEach(function(n){wrap(c,'* '+n,cw-10*u).forEach(function(t){if(draw)c.fillText(t,x+5*u,y+nf*.9);y+=nl;});});}
+  });
+  return y-y0;
+}
 var GDRAW={
  /* Safe zone, measured in VK (canvas px): desktop shows the bottom 3:1, so y<130 is cut. The mobile site shows the full
     width at ~390px; its round buttons cover x<270 and x>1620 for y<260, the avatar covers x 75–575 for y>500,
@@ -806,6 +841,34 @@ var GDRAW={
   if(ph){setFont(c,700,38);var t='Запись: '+ph,tw=c.measureText(t).width,isz=38,x=cx-(tw+isz+16)/2;
     iconPath(c,P_PHONE,x,pb-isz*.86,isz,COL.steel);c.fillStyle=COL.ink;c.textAlign='left';c.fillText(t,x+isz+16,pb);}
  },
+ pricelist:function(c,w,h){
+  grad(c,w,h);var img=bgImage('story_soft_nacre_v1');if(img.complete&&img.naturalWidth)coverImg(c,img,0,0,w,h);
+  var pages=pricePages(),k3=S.clinic,mx=Math.round(w*.07),cw2=w-2*mx,gap=Math.round(w*.035),colW=(cw2-gap)/2,u0=w/1080;
+  /* header */
+  var y=logo(c,w/2,mx*.7,1.1*u0,false)+46*u0;
+  setFont(c,800,64*u0);c.fillStyle=COL.ink;c.textAlign='center';c.fillText('Цены на услуги',w/2,y+52*u0);y+=64*u0*1.1;
+  var when=(S.price.badge||'').trim().replace(/^цены\s*/i,'');if(when){when=when.charAt(0).toUpperCase()+when.slice(1);setFont(c,600,28*u0);c.fillStyle=COL.soft;c.fillText(when,w/2,y+30*u0);y+=50*u0;}
+  y+=34*u0;
+  /* contacts plate and warning band at the bottom */
+  var bh=Math.round(h*WARN_SHARE),ph=[k3.ph1,k3.ph2,k3.ph3].map(function(s){return (s||'').trim();}).filter(Boolean),
+      a=[k3.addr1,k3.addr2].map(function(s){return (s||'').trim();}).filter(Boolean).join(', '),hr=(k3.hours||'').trim();
+  var info=[];if(a)info.push([P_PIN,a,500]);if(hr)info.push(['clock',hr,500]);if(ph.length)info.push([P_PHONE,'Запись: '+ph.join('   '),800]);
+  var ifs=28*u0,ilh=ifs*1.75,ipad=30*u0,ih=info.length?info.length*ilh+ipad*2-ifs*.75:0,iy=h-bh-mx*.55-ih;
+  var bottom=(info.length?iy-40*u0:h-bh-40*u0);
+  /* two columns of sections; the split and scale are chosen so everything fits */
+  var u=u0*1.15,best;
+  for(var t=0;t<40;t++){
+    var hs=pages.map(function(pg){return sheetBlock(c,pg,0,0,colW,u,false);}),bg=48*u;best=null;
+    for(var k=1;k<=pages.length;k++){var l=0,r=0;hs.forEach(function(v,i){if(i<k)l+=v+(i?bg:0);else r+=v+(i>k?bg:0);});var m=Math.max(l,r);if(!best||m<best.m)best={m:m,k:k};}
+    if(!best||y+best.m<=bottom)break;u*=.97;
+  }
+  if(best){var cy=[y,y],bgp=48*u;pages.forEach(function(pg,i){var col=i<best.k?0:1;cy[col]+=sheetBlock(c,pg,mx+col*(colW+gap),cy[col],colW,u,true)+bgp;});}
+  if(info.length){plate(c,mx,iy,cw2,ih,32*u0,'rgba(255,255,255,.9)',true,'rgba(255,255,255,.95)');
+    info.forEach(function(it,i){var ly=iy+ipad+i*ilh,isz=ifs*1.15,ix=mx+ipad;
+      if(it[0]==='clock')iconClock(c,ix,ly,isz,COL.steel);else iconPath(c,it[0],ix,ly,isz,COL.steel,it[0]===P_PIN);
+      var f2=ifs;setFont(c,it[2],f2);while(c.measureText(it[1]).width>cw2-ipad*2-isz-20*u0&&f2>12){f2-=1;setFont(c,it[2],f2);}c.fillStyle=COL.ink;c.textAlign='left';c.fillText(it[1],ix+isz+20*u0,ly+ifs*.92);});}
+  warnBand(c,w,h-bh,bh);
+ },
  avatar:function(c,w,h){
   grad(c,w,h);var img=bgImage('post_soft_nacre_v1');
   if(img.complete&&img.naturalWidth)fitBottom(c,img,-w*.1,0,w*1.2,h);
@@ -854,7 +917,7 @@ function show(v){
   $('#dock').hidden=v!=='editor';$('#btnBack').hidden=v==='gallery';$('#btnClinic').hidden=v==='clinic';
   window.scrollTo(0,0);
   if(v==='gallery')drawGallery();
-  if(v==='editor'){buildForm();redraw();if(groupTpl(S.tpl)){bgImage('post_soft_nacre_v1',redraw);bgImage('story_tray_right_v2',redraw);}}
+  if(v==='editor'){buildForm();redraw();if(groupTpl(S.tpl)){bgImage('post_soft_nacre_v1',redraw);bgImage('story_soft_nacre_v1',redraw);bgImage('story_tray_right_v2',redraw);}}
   if(v==='clinic')fillClinic();
 }
 
@@ -876,7 +939,7 @@ function drawGallery(){
   var gg=$('#ggrid');gg.innerHTML='';
   GROUP.forEach(function(t){
     var cvs=el('canvas',{width:t.w,height:t.h,'aria-hidden':'true'});
-    gg.appendChild(el('button',{type:'button','class':'tcard'+(t.w===t.h?' sq':''),on:{click:function(){S.tpl=t.id;show('editor');}}},[cvs,el('b',{text:t.name}),el('span',{text:t.desc})]));
+    gg.appendChild(el('button',{type:'button','class':'tcard'+(t.w<=t.h?' sq':''),on:{click:function(){S.tpl=t.id;show('editor');}}},[cvs,el('b',{text:t.name}),el('span',{text:t.desc})]));
     var paint=function(){render(cvs,t.id,S.fmt);};
     paint();bgImage('post_soft_nacre_v1',paint);bgImage('story_tray_right_v2',paint);
   });
@@ -948,6 +1011,9 @@ function buildForm(){
     var chk=ph.querySelector('input');chk.checked=!!cv2.phones;chk.addEventListener('change',function(){cv2.phones=chk.checked;redraw();});
     f.appendChild(sec('Текст',[textField('Строка под логотипом',cv2,'tagline'),ph]));
     f.appendChild(sec('Как поставить',[el('p',{style:'margin:0',text:'Управление → Настройки → Обложка сообщества → Загрузить. На компьютере ВК срезает верх обложки, на телефоне — низ и углы под кнопками. Всё важное уже стоит в видимой зоне.'})]));
+  }else if(S.tpl==='pricelist'){
+    f.appendChild(sec('Что на листе',[el('p',{style:'margin:0',text:'Все страницы из шаблона «Прайс» на одном листе: цены правятся там и сразу попадают сюда. Если услуг станет больше, шрифт немного уменьшится, чтобы всё поместилось.'}),el('button',{type:'button','class':'small',style:'align-self:flex-start',text:'Править цены',on:{click:function(){S.tpl='price';show('editor');}}})]));
+    f.appendChild(sec('Как печатать',[el('p',{style:'margin:0',text:'Картинка в размере А4 (300 точек на дюйм). Печатайте «по размеру страницы», без полей. Для группы ВК тоже подходит: например, в альбом или в пост.'})]));
   }else if(S.tpl==='avatar'){
     f.appendChild(sec('Как поставить',[el('p',{style:'margin:0',text:'На странице группы нажмите на аватар → «Загрузить фотографию». Выделите весь квадрат, затем круг для миниатюры по центру.'})]));
   }else if(S.tpl==='product'){
@@ -1011,7 +1077,7 @@ function buildForm(){
   }else{
     var q=S.tip;f.appendChild(sec('Текст',[textField('Метка',q,'label'),textField('Заголовок',q,'title'),textField('Текст',q,'text',{area:true,rows:5})]));
   }
-  if(!groupTpl(S.tpl)||S.tpl==='product'){
+  if(!groupTpl(S.tpl)||S.tpl==='product'||S.tpl==='pricelist'){
     var cap=el('textarea',{'class':'inp',id:'caption',rows:9,'aria-label':'Текст публикации'});
     var copy=el('button',{type:'button','class':'small',style:'align-self:flex-start',text:'Скопировать текст',on:{click:function(){copyText(cap.value);}}});
     var hint=S.tpl==='product'?'Вставьте в поле «Описание» товара. Цена для поля «Цена»: '+(vkPrice(curProduct())||'—')+' ₽.':'Вставьте его в пост под картинкой: так пост лучше находят в поиске и ленте. Текст можно поправить перед копированием.';
@@ -1060,8 +1126,8 @@ function caption(){
     parts.push('🦷 '+[my.title,my.sub].filter(Boolean).join('. ')+'. Листайте карточки 👉');
     mythPages().forEach(function(p){if(!p.cover)parts.push('❌ Миф: '+p.m+(p.t?'\n✅ Правда: '+p.t:''));});
     parts.push('Остались вопросы? Запишитесь на консультацию — врач всё расскажет.');
-  }else if(t==='price'){
-    parts.push('Цены в стоматологии «Жемчуг»'+(S.price.badge?' · '+S.price.badge.toLowerCase().replace(/^цены\s*/,''):'')+'. Листайте карточки 👉');
+  }else if(t==='price'||t==='pricelist'){
+    parts.push('Цены в стоматологии «Жемчуг»'+(S.price.badge?' · '+S.price.badge.toLowerCase().replace(/^цены\s*/,''):'')+(t==='price'?'. Листайте карточки 👉':'.'));
     pricePages().forEach(function(pg){var l=[];if(pg.title)l.push('🦷 '+pg.title.toUpperCase());
       pg.sections.forEach(function(s){if(s.name)l.push(s.name+':');s.rows.forEach(function(r){l.push('▫️ '+r.n+(r.p?' — '+r.p:''));});s.notes.forEach(function(n){l.push('* '+n);});});
       parts.push(l.join('\n'));});
@@ -1098,7 +1164,7 @@ var tt=0;function toast(m){var t=$('#toast');t.textContent=m;t.hidden=false;clea
 
 /* export */
 function fileName(){
-  var names={free:'svobodnoe-vremya',promo:'akciya',doc:'vrach',tip:'sovet',price:'prais',cover:'oblozhka',avatar:'avatar',product:'tovar',photo:'foto',myth:'mif'};
+  var names={free:'svobodnoe-vremya',promo:'akciya',doc:'vrach',tip:'sovet',price:'prais',cover:'oblozhka',avatar:'avatar',pricelist:'prais-a4',product:'tovar',photo:'foto',myth:'mif'};
   if(S.tpl==='product')return 'zhemchug-tovar-'+pad2(S.product.i+1)+'.png';
   if(groupTpl(S.tpl))return 'zhemchug-'+names[S.tpl]+'.png';
   var pg=S.tpl==='price'?'-'+((S.price.page||0)+1):S.tpl==='myth'?'-'+((S.myth.page||0)+1):'';
