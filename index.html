@@ -180,9 +180,10 @@ html.locked body>*:not(#gate){visibility:hidden}
         <div class="sec">
           <div class="field"><label for="c-addr1">Адрес</label><input class="inp" id="c-addr1" type="text"></div>
           <div class="field"><label for="c-addr2">Уточнение адреса (мелким шрифтом)</label><input class="inp" id="c-addr2" type="text"></div>
-          <div class="field"><label for="c-ph1">Телефон 1</label><input class="inp" id="c-ph1" type="text" inputmode="tel"></div>
-          <div class="field"><label for="c-ph2">Телефон 2</label><input class="inp" id="c-ph2" type="text" inputmode="tel"></div>
-          <div class="field"><label for="c-ph3">Телефон 3 (только в тексте постов)</label><input class="inp" id="c-ph3" type="text" inputmode="tel"></div>
+          <div class="field"><label for="c-ph1">Телефон 1</label><input class="inp" id="c-ph1" type="text" inputmode="tel"><label class="check"><input type="checkbox" id="c-req-ph1"> Обязательный: всегда на картинках и в текстах</label></div>
+          <div class="field"><label for="c-ph2">Телефон 2</label><input class="inp" id="c-ph2" type="text" inputmode="tel"><label class="check"><input type="checkbox" id="c-req-ph2"> Обязательный: всегда на картинках и в текстах</label></div>
+          <div class="field"><label for="c-ph3">Телефон 3</label><input class="inp" id="c-ph3" type="text" inputmode="tel"><label class="check"><input type="checkbox" id="c-req-ph3"> Обязательный: всегда на картинках и в текстах</label></div>
+          <span style="color:var(--muted);font-size:13px">Необязательные номера включаются в каждом шаблоне отдельно, в разделе «Телефоны».</span>
           <div class="field"><label for="c-hours">Часы работы (в тексте постов)</label><input class="inp" id="c-hours" type="text"></div>
           <div class="field"><label for="c-tags">Хэштеги (в конце каждого поста)</label><input class="inp" id="c-tags" type="text"></div>
           <label class="check"><input type="checkbox" id="c-show"> Показывать адрес и телефоны на картинках</label>
@@ -401,7 +402,7 @@ var today=iso(new Date());
 function nextSat(){var d=new Date();d.setDate(d.getDate()+(6-d.getDay()+7)%7);return iso(d);}
 var S={
  fmt:'story', tpl:'free',
- clinic:{addr1:'Бор, ул. Маяковского, 1А',addr2:'офисы 15, 17, 20, 29',ph1:'8-920-001-44-84',ph2:'8-999-390-44-84',ph3:'8-904-789-98-87',hours:'Пн–Пт 8:00–19:00, Сб и Вс — по записи',tags:'#стоматологияжемчуг #стоматологиябор #бор',show:true,docs:DOCS_DEFAULT},
+ clinic:{addr1:'Бор, ул. Маяковского, 1А',addr2:'офисы 15, 17, 20, 29',ph1:'8-920-001-44-84',ph2:'8-999-390-44-84',ph3:'8-904-789-98-87',hours:'Пн–Пт 8:00–19:00, Сб и Вс — по записи',req:{ph1:true,ph2:true,ph3:false},tags:'#стоматологияжемчуг #стоматологиябор #бор',show:true,docs:DOCS_DEFAULT},
  bgPick:{},
  free:{title:'Свободное время',sub:'',autoSub:true,who:'doctor',doctor:'Арутюнян Татьяна Николаевна',spec:'Терапевт',days:[{date:addDays(today,1),times:['10:20','11:00','12:20']},{date:addDays(today,2),times:['9:00','13:40']}]},
  promo:{badge:'Акция',title:'Профессиональная гигиена',value:'−20%',note:'до 30 ноября',text:'Ультразвук, Air Flow и полировка. Запишитесь по телефону.'},
@@ -414,12 +415,15 @@ var S={
  myth:{title:'Мифы о зубах',sub:'Разбираем с нашими врачами',text:MYTH_DEFAULT,page:0},
  dark:{tip:false,myth:true},
  weekend:{badge:'Выходные',title:'Принимаем в выходные',note:'Запись заранее по телефону',days:[{date:nextSat(),hours:'9:00–15:00',who:'Терапевт, хирург'},{date:addDays(nextSat(),1),hours:'9:00–14:00',who:'Терапевт'}]},
- avatar:{}
+ avatar:{},
+ /* optional phones switched on per template: {tpl:{ph3:true}} */
+ phoneOpt:{},
+ pricelist:{print:true}
 };
 var KEY='zhemchug-site-v1';
 try{var raw=localStorage.getItem(KEY); if(raw){var sv=JSON.parse(raw);
   ['fmt','tpl'].forEach(function(k){if(sv[k])S[k]=sv[k];});
-  ['clinic','bgPick','free','promo','doc','tip','price','cover','product','photo','myth','dark','weekend'].forEach(function(k){if(sv[k])Object.assign(S[k],sv[k]);});
+  ['clinic','bgPick','free','promo','doc','tip','price','cover','product','photo','myth','dark','weekend','phoneOpt','pricelist'].forEach(function(k){if(sv[k])Object.assign(S[k],sv[k]);});
 }}catch(e){}
 /* old saved address had a wrong office list */
 if(S.clinic.addr2==='офисы 15, 17, 29')S.clinic.addr2='офисы 15, 17, 20, 29';
@@ -523,11 +527,15 @@ function logo(c,cx,y,k,st){
   c.moveTo(cx-lw/2-70*k,sy-sf*.32);c.lineTo(cx-lw/2-24*k,sy-sf*.32);c.moveTo(cx+lw/2+24*k,sy-sf*.32);c.lineTo(cx+lw/2+70*k,sy-sf*.32);c.stroke();c.restore();
   return sy+10*k;
 }
+/* phones for a template: the required ones plus the optional ones switched on for it */
+var PHONE_KEYS=['ph1','ph2','ph3'],RT='';
+function phonesFor(tpl){var k=S.clinic,req=k.req||{},o=S.phoneOpt[tpl]||{};
+  return PHONE_KEYS.filter(function(f){return (k[f]||'').trim()&&(req[f]||o[f]);}).map(function(f){return k[f].trim();});}
 function drawHeader(c,y,st){return logo(c,W/2,y,1,st);}
 function drawFooter(c,H,st){
   var k=S.clinic,bm=st?112:76;
   if(!k.show)return H-bm;
-  var a1=(k.addr1||'').trim(),a2=(k.addr2||'').trim(),phones=[k.ph1,k.ph2].map(function(s){return (s||'').trim();}).filter(Boolean);
+  var a1=(k.addr1||'').trim(),a2=(k.addr2||'').trim(),phones=phonesFor(RT);
   if(!a1&&!phones.length)return H-bm;
   var cd=st?84:66,gap=st?24:16,mf=st?40:34,sf=st?31:27,lf=st?28:24,pf=st?50:40;
   var tx=M+cd+24,avail=W*.66-tx,lines=phones;
@@ -592,7 +600,7 @@ function drawPhoto(c,w,h,st,fmt){
   var k=st?.62:.6,lw=logoW(c,k,st)+64*k*1.6,lh=(st?84:72)*k*.78+(st?50:42)*k+10*k,ph=lh+54*k,top=st?150:44;
   plate(c,w/2-lw/2,top,lw,ph,ph/2,'rgba(255,255,255,.9)',true,'rgba(255,255,255,.95)');logo(c,w/2,top+30*k,k,st);
   /* caption plate at the bottom, above VK's reply bar in stories */
-  var pad=st?44:36,iw=w-2*M-pad*2,ts=st?66:56,xs=st?36:32,ph1=S.clinic.show?(S.clinic.ph1||'').trim():'';
+  var pad=st?44:36,iw=w-2*M-pad*2,ts=st?66:56,xs=st?36:32,ph1=S.clinic.show?phonesFor(RT).join('   '):'';
   var tl=[];if(d.title){for(;ts>=40;ts-=2){setFont(c,800,ts);tl=wrap(c,d.title,iw);if(tl.length<=3)break;}
     if(tl.length>3){tl=tl.slice(0,3);tl[2]=tl[2].replace(/[\s,.;:]*$/,'')+'…';}}
   setFont(c,500,xs);var xl=d.text?wrap(c,d.text,iw).slice(0,4):[];
@@ -604,7 +612,7 @@ function drawPhoto(c,w,h,st,fmt){
   if(d.label){var lf=st?26:24;setFont(c,800,lf);ls(c,5);c.fillStyle=LIGHT_COL.steel;c.fillText(d.label.toUpperCase(),M+pad,y+lf*.85);ls(c,0);y+=lf*1.7;}
   setFont(c,800,ts);c.fillStyle=LIGHT_COL.ink;tl.forEach(function(l){c.fillText(l,M+pad,y+ts*.82);y+=ts*1.1;});
   if(xl.length){if(tl.length)y+=16;setFont(c,500,xs);xl.forEach(function(l){c.fillText(l,M+pad,y+xs*.95);y+=xs*1.38;});}
-  if(ph1){if(tl.length||xl.length)y+=26;var isz=34;iconPath(c,P_PHONE,M+pad,y+5,isz,LIGHT_COL.steel);setFont(c,700,32);c.fillStyle=LIGHT_COL.ink;c.fillText('Запись: '+ph1,M+pad+isz+14,y+33);}
+  if(ph1){if(tl.length||xl.length)y+=26;var isz=34,pf=32,pt='Запись: '+ph1;setFont(c,700,pf);while(c.measureText(pt).width>iw-isz-14&&pf>20){pf--;setFont(c,700,pf);}iconPath(c,P_PHONE,M+pad,y+5,isz,LIGHT_COL.steel);c.fillStyle=LIGHT_COL.ink;c.fillText(pt,M+pad+isz+14,y+33);}
 }
 
 /* ================= TEMPLATES ================= */
@@ -811,7 +819,7 @@ function sheetBlock(c,pg,x,y,cw,u,draw,flat){
       /* a word longer than the name column would run into the price: report «does not fit», so the caller picks a smaller scale */
       if(rows.some(function(r){return words(r.n).some(function(w){return c.measureText(w).width>nameW;});}))over=true;
       rows.forEach(function(r){h+=r.lines.length*lh+rp*2;});
-      if(draw){plate(c,x,y,cw,h,28*u,'rgba(255,255,255,.86)',true,'rgba(255,255,255,.95)');
+      if(draw){sheetPlate(c,x,y,cw,h,28*u);
         var yy=y+pad-rp;
         rows.forEach(function(r,i){
           if(i>0){c.fillStyle='rgba(22,51,91,.10)';c.fillRect(x+pad,yy,cw-pad*2,2*u);}
@@ -827,8 +835,13 @@ function sheetBlock(c,pg,x,y,cw,u,draw,flat){
   return over&&!draw?1e9:y-y0;
 }
 /* every page of «Прайс» on one image: an A4 sheet for print, or a 4:5 post where size goes to the prices */
+/* print look: white paper, outlined plates, no photo and no shadows — cheap on ink and clean in black and white */
+var SHEET_PRINT=false;
+function sheetPlate(c,x,y,w,h,r,fill){if(SHEET_PRINT)plate(c,x,y,w,h,r,fill==='soft'?'#EEF5FC':'#FFFFFF',false,'rgba(22,51,91,.22)');else plate(c,x,y,w,h,r,fill==='soft'?'rgba(255,255,255,.9)':'rgba(255,255,255,.86)',true,'rgba(255,255,255,.95)');}
 function drawSheet(c,w,h,post){
-  grad(c,w,h);var img=bgImage('story_soft_nacre_v1');if(img.complete&&img.naturalWidth)coverImg(c,img,0,0,w,h);
+  SHEET_PRINT=!post&&!!S.pricelist.print;
+  if(SHEET_PRINT){c.fillStyle='#FFFFFF';c.fillRect(0,0,w,h);}
+  else{grad(c,w,h);var img=bgImage('story_soft_nacre_v1');if(img.complete&&img.naturalWidth)coverImg(c,img,0,0,w,h);}
   var pages=pricePages(),k3=S.clinic,mx=Math.round(w*(post?.045:.07)),cw2=w-2*mx,gap=Math.round(w*(post?.03:.035)),colW=(cw2-gap)/2,u0=w/1080;
   /* header */
   var when=(S.price.badge||'').trim().replace(/^цены\s*/i,''),y;
@@ -839,10 +852,11 @@ function drawSheet(c,w,h,post){
     y=logo(c,w/2,mx*.7,1.1*u0,false)+46*u0;
     setFont(c,800,64*u0);c.fillStyle=COL.ink;c.textAlign='center';c.fillText('Цены на услуги',w/2,y+52*u0);y+=64*u0*1.1;
     if(when){when=when.charAt(0).toUpperCase()+when.slice(1);setFont(c,600,28*u0);c.fillStyle=COL.soft;c.fillText(when,w/2,y+30*u0);y+=50*u0;}
+    if(SHEET_PRINT){rr(c,w/2-60*u0,y+6*u0,120*u0,6*u0,3*u0);c.fillStyle='#A9CBEA';c.fill();y+=12*u0;}
     y+=34*u0;
   }
   /* contacts plate and warning band at the bottom */
-  var bh=Math.round(h*WARN_SHARE),ph=[k3.ph1,k3.ph2,k3.ph3].map(function(s){return (s||'').trim();}).filter(Boolean),
+  var bh=Math.round(h*WARN_SHARE),ph=phonesFor(RT),
       a=[k3.addr1,k3.addr2].map(function(s){return (s||'').trim();}).filter(Boolean).join(', '),hr=(k3.hours||'').trim();
   var info=[];if(post){if(ph.length)info.push([P_PHONE,'Запись: '+ph.join('   '),800]);if(a)info.push([P_PIN,a,500]);}
   else{if(a)info.push([P_PIN,a,500]);if(hr)info.push(['clock',hr,500]);if(ph.length)info.push([P_PHONE,'Запись: '+ph.join('   '),800]);}
@@ -863,7 +877,7 @@ function drawSheet(c,w,h,post){
   });
   if(best){var u=best.u,cy=[y,y],bgp=(post?34:48)*u;
     pages.forEach(function(pg,i){var col=i<best.k?0:1;cy[col]+=sheetBlock(c,pg,mx+col*(best.cw+gap),cy[col],best.cw,u,true,post)+bgp;});}
-  if(info.length){plate(c,mx,iy,cw2,ih,32*u0,'rgba(255,255,255,.9)',true,'rgba(255,255,255,.95)');
+  if(info.length){sheetPlate(c,mx,iy,cw2,ih,32*u0,'soft');
     info.forEach(function(it,i){var ly=iy+ipad+i*ilh,isz=ifs*1.15,ix=mx+ipad;
       if(it[0]==='clock')iconClock(c,ix,ly,isz,COL.steel);else iconPath(c,it[0],ix,ly,isz,COL.steel,it[0]===P_PIN);
       var f2=ifs;setFont(c,it[2],f2);while(c.measureText(it[1]).width>cw2-ipad*2-isz-20*u0&&f2>12){f2-=1;setFont(c,it[2],f2);}c.fillStyle=COL.ink;c.textAlign='left';c.fillText(it[1],ix+isz+20*u0,ly+ifs*.92);});}
@@ -878,7 +892,7 @@ var GDRAW={
   if(img.complete&&img.naturalWidth)fitBottom(c,img,0,0,w,h);
   var d=S.cover,k3=S.clinic,
       a1=(k3.addr1||'').trim(),a2=(k3.addr2||'').trim(),
-      ps=[k3.ph1,k3.ph2].map(function(s){return (s||'').trim();}).filter(Boolean),
+      ps=phonesFor(RT),
       card=d.phones&&(a1||ps.length),cx=card?690:w/2;
   /* left: logo + tagline, kept above the mobile avatar */
   var setTag=function(){setFont(c,600,52);},tl=[];
@@ -926,9 +940,9 @@ var GDRAW={
     var pw=c.measureText(p.price).width+140;plate(c,cx-pw/2,y,pw,priceH,priceH/2,'rgba(255,255,255,.9)',true,'rgba(255,255,255,.95)');
     c.fillStyle=COL.ink;c.fillText(p.price,cx,y+priceH/2+ps*.36);y+=priceH;}
   if(nl.length){setFont(c,500,ns);c.fillStyle=COL.soft;y+=14;nl.forEach(function(l){c.fillText(l,cx,y+ns*1.05);y+=ns*1.32;});}
-  var bh=Math.round(h*WARN_SHARE),pb=h-bh-44,ph=(S.clinic.ph1||'').trim();
+  var bh=Math.round(h*WARN_SHARE),pb=h-bh-44,ph=phonesFor(RT).join('   ');
   warnBand(c,w,h-bh,bh);
-  if(ph){setFont(c,700,38);var t='Запись: '+ph,tw=c.measureText(t).width,isz=38,x=cx-(tw+isz+16)/2;
+  if(ph){var t='Запись: '+ph,pf=38;setFont(c,700,pf);while(c.measureText(t).width>w-200&&pf>22){pf--;setFont(c,700,pf);}var tw=c.measureText(t).width,isz=38,x=cx-(tw+isz+16)/2;
     iconPath(c,P_PHONE,x,pb-isz*.86,isz,COL.steel);c.fillStyle=COL.ink;c.textAlign='left';c.fillText(t,x+isz+16,pb);}
  },
  pricelist:function(c,w,h){drawSheet(c,w,h,false);},
@@ -947,7 +961,7 @@ var GDRAW={
 var SCALES=[1,.93,.86,.79,.72,.66,.6,.55,.5];
 var scratch=document.createElement('canvas');scratch.width=W;scratch.height=3600;var sx=scratch.getContext('2d');
 function render(canvas,tpl,fmt){
-  var gt=groupTpl(tpl);
+  RT=tpl;var gt=groupTpl(tpl);
   if(gt){canvas.width=gt.w;canvas.height=gt.h;var gc=canvas.getContext('2d');gc.textBaseline='alphabetic';GDRAW[tpl](gc,gt.w,gt.h);return;}
   var H=FORMATS[fmt].h,st=fmt==='story',dark=isDark(tpl),id=bgFor(tpl,fmt),meta=dark?{right:.94}:bgMeta(id),img=bgImage(id);
   canvas.width=W;canvas.height=H;var c=canvas.getContext('2d');c.textBaseline='alphabetic';
@@ -1065,6 +1079,15 @@ function daysSection(){
   box.appendChild(el('span',{'class':'hint',style:'color:var(--muted);font-size:13px',text:'Один день с одним временем показывается крупной карточкой. Можно вписать несколько времён через пробел. Время можно не указывать: тогда на картинке будет «Уточняйте по телефону».'}));
   return box;
 }
+function phoneSection(){
+  var k=S.clinic,req=k.req||{},o=S.phoneOpt[S.tpl]=S.phoneOpt[S.tpl]||{},box=el('div',{'class':'field'});
+  PHONE_KEYS.forEach(function(f){var v=(k[f]||'').trim();if(!v)return;
+    var cb=el('input',{type:'checkbox'});cb.checked=!!(req[f]||o[f]);cb.disabled=!!req[f];
+    cb.addEventListener('change',function(){o[f]=cb.checked;redraw();});
+    var l=el('label',{'class':'check'},[cb]);l.appendChild(document.createTextNode(' '+v+(req[f]?' — обязательный':'')));box.appendChild(l);});
+  box.appendChild(el('span',{style:'color:var(--muted);font-size:13px',text:'Обязательные номера меняются на странице «Клиника». Выбор действует и на картинку, и на текст поста.'}));
+  return sec('Телефоны',[box]);
+}
 function buildForm(){
   var f=$('#form');f.innerHTML='';var t=tplInfo(S.tpl);
   f.appendChild(el('h2',{text:t.name}));
@@ -1076,6 +1099,9 @@ function buildForm(){
     f.appendChild(sec('Текст',[textField('Строка под логотипом',cv2,'tagline'),ph]));
     f.appendChild(sec('Как поставить',[el('p',{style:'margin:0',text:'Управление → Настройки → Обложка сообщества → Загрузить. На компьютере ВК срезает верх обложки, на телефоне — низ и углы под кнопками. Всё важное уже стоит в видимой зоне.'})]));
   }else if(S.tpl==='pricelist'||S.tpl==='pricepost'){
+    if(S.tpl==='pricelist'){var look=el('div',{'class':'chips',role:'group','aria-label':'Вид листа'});
+      [[true,'Для принтера: белый фон'],[false,'С фоном: для экрана']].forEach(function(o){look.appendChild(el('button',{type:'button','class':'chip','aria-pressed':String(!!S.pricelist.print===o[0]),text:o[1],on:{click:function(){S.pricelist.print=o[0];buildForm();redraw();}}}));});
+      f.appendChild(sec('Вид',[look,el('span',{style:'color:var(--muted);font-size:13px',text:'Белый вариант экономит краску и хорошо выглядит и в цвете, и в чёрно-белой печати.'})]));}
     f.appendChild(sec('Что на листе',[el('p',{style:'margin:0',text:'Все страницы из шаблона «Прайс» на одной картинке: цены правятся там и сразу попадают сюда. Если услуг станет больше, шрифт немного уменьшится, чтобы всё поместилось.'}),el('button',{type:'button','class':'small',style:'align-self:flex-start',text:'Править цены',on:{click:function(){S.tpl='price';show('editor');}}})]));
     if(S.tpl==='pricepost')f.appendChild(sec('Как выложить',[el('p',{style:'margin:0',text:'Одна картинка вместо карусели: выложите её постом с текстом ниже и закрепите пост. Картинка в двойном размере, поэтому цены остаются чёткими, если открыть её и увеличить.'})]));
     else f.appendChild(sec('Как печатать',[el('p',{style:'margin:0',text:'Картинка в размере А4 (300 точек на дюйм). Печатайте «по размеру страницы», без полей. Для группы ВК тоже подходит: например, в альбом или в пост.'})]));
@@ -1157,6 +1183,7 @@ function buildForm(){
   }else{
     var q=S.tip;f.appendChild(sec('Текст',[textField('Метка',q,'label'),textField('Заголовок',q,'title'),textField('Текст',q,'text',{area:true,rows:5})]));
   }
+  if(S.tpl!=='avatar')f.appendChild(phoneSection());
   if(!groupTpl(S.tpl)||S.tpl==='product'||S.tpl==='pricelist'||S.tpl==='pricepost'){
     var cap=el('textarea',{'class':'inp',id:'caption',rows:9,'aria-label':'Текст публикации'});
     var copy=el('button',{type:'button','class':'small',style:'align-self:flex-start',text:'Скопировать текст',on:{click:function(){copyText(cap.value);}}});
@@ -1173,7 +1200,7 @@ var WDF=['воскресенье','понедельник','вторник','с�
 function wdayFull(s){var p=String(s||'').split('-');if(p.length!==3)return '';return WDF[new Date(+p[0],+p[1]-1,+p[2]).getDay()];}
 function wday(s){var p=String(s||'').split('-');if(p.length!==3)return '';return WD[new Date(+p[0],+p[1]-1,+p[2]).getDay()];}
 function contacts(){
-  var k=S.clinic,o=[],ph=[k.ph1,k.ph2,k.ph3].map(function(s){return (s||'').trim();}).filter(Boolean);
+  var k=S.clinic,o=[],ph=phonesFor(S.tpl);
   if(ph.length)o.push('Запись по телефону:\n'+ph.map(function(p){return '📞 '+p;}).join('\n'));
   var a=[k.addr1,k.addr2].map(function(s){return (s||'').trim();}).filter(Boolean).join(', ');if(a)o.push('📍 '+a);
   if((k.hours||'').trim())o.push('🕘 '+k.hours.trim());
@@ -1236,9 +1263,11 @@ var CLINIC_FIELDS=[['c-addr1','addr1'],['c-addr2','addr2'],['c-ph1','ph1'],['c-p
 function fillClinic(){
   var k=S.clinic;CLINIC_FIELDS.forEach(function(p){$('#'+p[0]).value=k[p[1]]||'';});
   $('#c-show').checked=!!k.show;
+  PHONE_KEYS.forEach(function(f){$('#c-req-'+f).checked=!!(k.req&&k.req[f]);});
 }
 CLINIC_FIELDS.forEach(function(p){$('#'+p[0]).addEventListener('input',function(e){S.clinic[p[1]]=e.target.value;persist();});});
 $('#c-show').addEventListener('change',function(e){S.clinic.show=e.target.checked;persist();});
+PHONE_KEYS.forEach(function(f){$('#c-req-'+f).addEventListener('change',function(e){S.clinic.req=Object.assign({},S.clinic.req);S.clinic.req[f]=e.target.checked;persist();});});
 $('#c-reset').addEventListener('click',function(){S.clinic.docs=DOCS_DEFAULT;$('#c-docs').value=DOCS_DEFAULT;persist();toast('Список врачей восстановлен.');});
 
 $('#home').addEventListener('click',function(){show('gallery');});
@@ -1252,7 +1281,7 @@ var tt=0;function toast(m){var t=$('#toast');t.textContent=m;t.hidden=false;clea
 function fileName(){
   var names={free:'svobodnoe-vremya',weekend:'vyhodnye',promo:'akciya',doc:'vrach',tip:'sovet',price:'prais',cover:'oblozhka',avatar:'avatar',pricelist:'prais-a4',pricepost:'prais-post',product:'tovar',photo:'foto',myth:'mif'};
   if(S.tpl==='product')return 'zhemchug-tovar-'+pad2(S.product.i+1)+'.png';
-  if(groupTpl(S.tpl))return 'zhemchug-'+names[S.tpl]+'.png';
+  if(groupTpl(S.tpl))return 'zhemchug-'+names[S.tpl]+(S.tpl==='pricelist'&&S.pricelist.print?'-pechat':'')+'.png';
   var pg=S.tpl==='price'?'-'+((S.price.page||0)+1):S.tpl==='myth'?'-'+((S.myth.page||0)+1):'';
   return 'zhemchug-'+names[S.tpl]+pg+'-'+(S.fmt==='story'?'istoriya':'post')+'-'+today+'.png';
 }
