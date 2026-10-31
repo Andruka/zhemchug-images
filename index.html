@@ -303,7 +303,8 @@ var GROUP=[
  {id:'cover',name:'Обложка группы',desc:'1920×768, для ВКонтакте',w:1920,h:768},
  {id:'avatar',name:'Аватар группы',desc:'800×800, видна в круге',w:800,h:800},
  {id:'product',name:'Карточка товара',desc:'1080×1080, для раздела «Товары»',w:1080,h:1080},
- {id:'pricepost',name:'Прайс одним постом',desc:'Все цены на одной картинке для ленты',w:1440,h:2560},
+ /* 2:3 is the tallest picture VK shows whole in the feed: taller ones are cropped top and bottom */
+ {id:'pricepost',name:'Прайс одним постом',desc:'Все цены на одной картинке для ленты',w:1440,h:2160},
  {id:'pricelist',name:'Прайс на листе А4',desc:'Все услуги на одной странице, для печати',w:2480,h:3508}
 ];
 function groupTpl(id){for(var i=0;i<GROUP.length;i++)if(GROUP[i].id===id)return GROUP[i];return null;}
