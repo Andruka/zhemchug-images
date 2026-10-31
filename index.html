@@ -418,7 +418,7 @@ var S={
  weekend:{badge:'Выходные',title:'Принимаем в выходные',note:'Запись заранее по телефону',days:[{date:nextSat(),hours:'9:00–15:00',who:'Терапевт, хирург'},{date:addDays(nextSat(),1),hours:'9:00–14:00',who:'Терапевт'}]},
  avatar:{},
  /* optional phones switched on per template: {tpl:{ph3:true}} */
- phoneOpt:{},
+ phoneOpt:{cover:{ph3:true}},
  pricelist:{print:true}
 };
 var KEY='zhemchug-site-v1';
@@ -909,17 +909,21 @@ var GDRAW={
   /* right: white card with address and phones, below the mobile menu button */
   var x0=1090,cw=700,pad=40,isz=50,tx=x0+pad+isz+24,tw=x0+cw-pad-tx;
   function fit(t,wt,sz){setFont(c,wt,sz);while(c.measureText(t).width>tw&&sz>30){sz-=2;setFont(c,wt,sz);}return sz;}
+  /* address row, then one phone block: all numbers at one size under one icon, so three still fit
+     between the mobile menu button (y<260) and the bottom edge */
   var rows=[];
-  if(a1)rows.push({ic:P_PIN,t:a1,wt:700,sz:fit(a1,700,44),sub:a2,h:a2?100:60});
-  ps.forEach(function(p){rows.push({ic:P_PHONE,t:p,wt:800,sz:fit(p,800,60),h:72});});
-  var gap=28,ch=pad*2+rows.reduce(function(s,r){return s+r.h;},0)+gap*(rows.length-1),y0=Math.max(300,490-ch/2);
+  if(a1)rows.push({ic:P_PIN,t:[a1],wt:700,sz:fit(a1,700,44),sub:a2,h:a2?100:60});
+  if(ps.length){var psz=60;ps.forEach(function(p){psz=Math.min(psz,fit(p,800,60));});var plh=Math.round(psz*1.17);
+    rows.push({ic:P_PHONE,t:ps,wt:800,sz:psz,lh:plh,h:ps.length===1?72:ps.length*plh});}
+  var gap=28,ch=pad*2+rows.reduce(function(s,r){return s+r.h;},0)+gap*(rows.length-1),y0=Math.max(270,480-ch/2);
   plate(c,x0,y0,cw,ch,40,'rgba(255,255,255,.86)',true,'rgba(255,255,255,.95)');
   var yy=y0+pad;
   rows.forEach(function(r,i){
     if(i){c.save();c.fillStyle='rgba(22,51,91,.12)';c.fillRect(x0+pad,yy-gap/2-1,cw-pad*2,2);c.restore();}
-    var base=yy+r.sz*.78+(r.sub?0:(r.h-r.sz)/2-r.sz*.06);
-    iconPath(c,r.ic,x0+pad,base-r.sz*.36-isz/2,isz,COL.steel,r.ic===P_PIN);
-    setFont(c,r.wt,r.sz);c.fillStyle=COL.ink;c.textAlign='left';c.fillText(r.t,tx,base);
+    var one=r.t.length===1,base=one?yy+r.sz*.78+(r.sub?0:(r.h-r.sz)/2-r.sz*.06):yy+(r.lh-r.sz)/2+r.sz*.78;
+    iconPath(c,r.ic,x0+pad,(one?base-r.sz*.36:yy+r.h/2)-isz/2,isz,COL.steel,r.ic===P_PIN);
+    setFont(c,r.wt,r.sz);c.fillStyle=COL.ink;c.textAlign='left';
+    r.t.forEach(function(t,j){c.fillText(t,tx,base+j*(r.lh||0));});
     if(r.sub){var sz=fit(r.sub,500,36);setFont(c,500,sz);c.fillStyle=COL.soft;c.fillText(r.sub,tx,base+48);}
     yy+=r.h+gap;
   });
